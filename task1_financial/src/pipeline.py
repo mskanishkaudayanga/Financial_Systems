@@ -2,7 +2,7 @@
 Main execution pipeline for financial analysis and signal generation.
 
 Orchestrates market data fetching (Phase 1), technical indicator calculations (Phase 2),
-financial summary generation, and news headline retrieval (Phase 3).
+financial summary generation & news retrieval (Phase 3), and LLM sentiment analysis (Phase 4).
 """
 
 from typing import Any, Dict, Tuple
@@ -13,15 +13,17 @@ from src.data.market_data import fetch_market_data
 from src.data.news_data import fetch_news_data
 from src.features.summary import generate_financial_summary
 from src.features.technical_indicators import calculate_indicators
+from src.llm.sentiment import analyze_batch_sentiment
+from src.schemas.models import AggregatedSentiment
 
 
 def run_pipeline(
     ticker: str = config.DEFAULT_TICKER,
     years: int = config.LOOKBACK_YEARS,
     news_limit: int = config.NEWS_HEADLINES_LIMIT,
-) -> Tuple[pd.DataFrame, Dict[str, Any], list]:
+) -> Tuple[pd.DataFrame, Dict[str, Any], list, AggregatedSentiment]:
     """
-    Run Phase 1, Phase 2, and Phase 3 pipeline.
+    Run Phase 1 through Phase 4 execution pipeline.
 
     Args:
         ticker: Target stock ticker symbol.
@@ -29,7 +31,8 @@ def run_pipeline(
         news_limit: Headline count limit.
 
     Returns:
-        Tuple[pd.DataFrame, Dict[str, Any], list]: (DataFrame with indicators, Summary Dict, News List)
+        Tuple[pd.DataFrame, Dict[str, Any], list, AggregatedSentiment]:
+            (Market DataFrame, Summary Dict, News List, Aggregated Sentiment Model)
     """
     print("=" * 75)
     print(f"1. Fetching Market Data for Ticker: '{ticker}' ({years} years lookback)...")
@@ -48,11 +51,16 @@ def run_pipeline(
     print(f"\n4. Retrieving & Normalizing News Headlines (Target: {news_limit})...")
     news_list = fetch_news_data(ticker=ticker, limit=news_limit)
     print(f"   Success! Retrieved {len(news_list)} normalized headlines.")
-    if news_list:
-        print(f"   Sample Headline: \"{news_list[0]['headline']}\" ({news_list[0]['source']})")
+
+    print("\n5. Running LLM News Sentiment Analysis & Confidence-Weighted Aggregation...")
+    sentiment_result = analyze_batch_sentiment(news_list, ticker=ticker)
+    print(f"   - Total Headlines Evaluated: {sentiment_result.total_headlines}")
+    print(f"   - Positive: {sentiment_result.positive_count} | Negative: {sentiment_result.negative_count} | Neutral: {sentiment_result.neutral_count}")
+    print(f"   - Weighted Sentiment Score: {sentiment_result.weighted_sentiment_score:.4f}")
+    print(f"   - Overall Sentiment Label: {sentiment_result.overall_label}")
     print("=" * 75)
 
-    return df_indicators, summary, news_list
+    return df_indicators, summary, news_list, sentiment_result
 
 
 if __name__ == "__main__":
