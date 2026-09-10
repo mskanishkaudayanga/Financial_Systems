@@ -2,7 +2,8 @@
 Main execution pipeline for financial analysis and signal generation.
 
 Orchestrates market data fetching (Phase 1), technical indicator calculations (Phase 2),
-financial summary generation & news retrieval (Phase 3), and LLM sentiment analysis (Phase 4).
+financial summary generation & news retrieval (Phase 3), LLM sentiment analysis (Phase 4),
+and LLM trading recommendation reasoning (Phase 5).
 """
 
 from typing import Any, Dict, Tuple
@@ -14,16 +15,17 @@ from src.data.news_data import fetch_news_data
 from src.features.summary import generate_financial_summary
 from src.features.technical_indicators import calculate_indicators
 from src.llm.sentiment import analyze_batch_sentiment
-from src.schemas.models import AggregatedSentiment
+from src.llm.signal import generate_trading_signal
+from src.schemas.models import AggregatedSentiment, TradingRecommendation
 
 
 def run_pipeline(
     ticker: str = config.DEFAULT_TICKER,
     years: int = config.LOOKBACK_YEARS,
     news_limit: int = config.NEWS_HEADLINES_LIMIT,
-) -> Tuple[pd.DataFrame, Dict[str, Any], list, AggregatedSentiment]:
+) -> Tuple[pd.DataFrame, Dict[str, Any], list, AggregatedSentiment, TradingRecommendation]:
     """
-    Run Phase 1 through Phase 4 execution pipeline.
+    Run full end-to-end Task 1 pipeline (Phase 1 through Phase 5).
 
     Args:
         ticker: Target stock ticker symbol.
@@ -31,10 +33,10 @@ def run_pipeline(
         news_limit: Headline count limit.
 
     Returns:
-        Tuple[pd.DataFrame, Dict[str, Any], list, AggregatedSentiment]:
-            (Market DataFrame, Summary Dict, News List, Aggregated Sentiment Model)
+        Tuple[pd.DataFrame, Dict[str, Any], list, AggregatedSentiment, TradingRecommendation]:
+            (Market DataFrame, Summary Dict, News List, Aggregated Sentiment, Trading Recommendation)
     """
-    print("=" * 75)
+    print("=" * 80)
     print(f"1. Fetching Market Data for Ticker: '{ticker}' ({years} years lookback)...")
     df_market = fetch_market_data(ticker=ticker, years=years)
     print(f"   Success! Fetched {len(df_market)} daily OHLCV bars.")
@@ -54,13 +56,22 @@ def run_pipeline(
 
     print("\n5. Running LLM News Sentiment Analysis & Confidence-Weighted Aggregation...")
     sentiment_result = analyze_batch_sentiment(news_list, ticker=ticker)
-    print(f"   - Total Headlines Evaluated: {sentiment_result.total_headlines}")
-    print(f"   - Positive: {sentiment_result.positive_count} | Negative: {sentiment_result.negative_count} | Neutral: {sentiment_result.neutral_count}")
-    print(f"   - Weighted Sentiment Score: {sentiment_result.weighted_sentiment_score:.4f}")
     print(f"   - Overall Sentiment Label: {sentiment_result.overall_label}")
-    print("=" * 75)
+    print(f"   - Weighted Sentiment Score: {sentiment_result.weighted_sentiment_score:.4f}")
 
-    return df_indicators, summary, news_list, sentiment_result
+    print("\n6. Synthesizing LLM Trading Recommendation & Evidence-Based Reasoning...")
+    latest_row = df_indicators.iloc[-1]
+    recommendation = generate_trading_signal(
+        ticker=ticker,
+        summary=summary,
+        latest_indicators=latest_row,
+        news_sentiment=sentiment_result
+    )
+    print(f"   - RECOMMENDATION: {recommendation.recommendation}")
+    print(f"   - REASONING: {recommendation.reasoning}")
+    print("=" * 80)
+
+    return df_indicators, summary, news_list, sentiment_result, recommendation
 
 
 if __name__ == "__main__":
