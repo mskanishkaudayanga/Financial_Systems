@@ -1,44 +1,58 @@
 """
 Main execution pipeline for financial analysis and signal generation.
 
-Orchestrates market data fetching (Phase 1) and technical indicator calculations (Phase 2).
+Orchestrates market data fetching (Phase 1), technical indicator calculations (Phase 2),
+financial summary generation, and news headline retrieval (Phase 3).
 """
+
+from typing import Any, Dict, Tuple
+import pandas as pd
 
 from src.config import config
 from src.data.market_data import fetch_market_data
+from src.data.news_data import fetch_news_data
+from src.features.summary import generate_financial_summary
 from src.features.technical_indicators import calculate_indicators
 
 
-def run_pipeline(ticker: str = config.DEFAULT_TICKER, years: int = config.LOOKBACK_YEARS):
+def run_pipeline(
+    ticker: str = config.DEFAULT_TICKER,
+    years: int = config.LOOKBACK_YEARS,
+    news_limit: int = config.NEWS_HEADLINES_LIMIT,
+) -> Tuple[pd.DataFrame, Dict[str, Any], list]:
     """
-    Run Phase 1 & Phase 2 pipeline: Fetch market data and compute technical indicators.
+    Run Phase 1, Phase 2, and Phase 3 pipeline.
 
     Args:
         ticker: Target stock ticker symbol.
-        years: Lookback years.
+        years: Market data lookback years.
+        news_limit: Headline count limit.
 
     Returns:
-        pd.DataFrame: Processed market data with computed technical indicators.
+        Tuple[pd.DataFrame, Dict[str, Any], list]: (DataFrame with indicators, Summary Dict, News List)
     """
-    print("=" * 70)
+    print("=" * 75)
     print(f"1. Fetching Market Data for Ticker: '{ticker}' ({years} years lookback)...")
     df_market = fetch_market_data(ticker=ticker, years=years)
     print(f"   Success! Fetched {len(df_market)} daily OHLCV bars.")
-    print(df_market.head())
-    print(f"   Date Range: {df_market.index.min().strftime('%Y-%m-%d')} to {df_market.index.max().strftime('%Y-%m-%d')}")
 
-    print("\n2. Computing Technical Indicators (SMA-50, SMA-200, RSI-14, MACD, Bollinger Bands)...")
+    print("\n2. Computing Technical Indicators (SMA, RSI, MACD, Bollinger Bands)...")
     df_indicators = calculate_indicators(df_market)
     print(f"   Success! Final DataFrame shape: {df_indicators.shape}")
-    print(f"   Columns Added: {[c for c in df_indicators.columns if c not in df_market.columns]}")
 
-    print("\n3. Sample Output (Latest 5 Trading Days):")
-    print("-" * 70)
-    display_cols = ["Close", "SMA_50", "SMA_200", "RSI_14", "MACD_Hist", "BB_Middle", "BB_Upper", "BB_Lower"]
-    print(df_indicators[display_cols].tail(5).to_string())
-    print("=" * 70)
+    print("\n3. Generating Financial Summary & Deterministic Momentum Signal...")
+    summary = generate_financial_summary(ticker=ticker, df=df_indicators)
+    for key, val in summary.items():
+        print(f"   - {key}: {val}")
 
-    return df_indicators
+    print(f"\n4. Retrieving & Normalizing News Headlines (Target: {news_limit})...")
+    news_list = fetch_news_data(ticker=ticker, limit=news_limit)
+    print(f"   Success! Retrieved {len(news_list)} normalized headlines.")
+    if news_list:
+        print(f"   Sample Headline: \"{news_list[0]['headline']}\" ({news_list[0]['source']})")
+    print("=" * 75)
+
+    return df_indicators, summary, news_list
 
 
 if __name__ == "__main__":

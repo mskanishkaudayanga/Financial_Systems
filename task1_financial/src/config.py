@@ -31,7 +31,10 @@ class Config:
 
     # LLM Configuration (Credentials MUST come from environment)
     LLM_API_KEY: Optional[str] = os.getenv("LLM_API_KEY")
-    LLM_MODEL_NAME: str = os.getenv("LLM_MODEL_NAME", "default-model")
+    LLM_MODEL_NAME: str = os.getenv("LLM_MODEL_NAME", "gpt-4o-mini")
+    LLM_BASE_URL: str = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
+    LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.0"))
+    LLM_TIMEOUT: int = int(os.getenv("LLM_TIMEOUT", "15"))
 
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
