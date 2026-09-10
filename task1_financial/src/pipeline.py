@@ -1,77 +1,153 @@
 """
-Main execution pipeline for financial analysis and signal generation.
+Main execution pipeline for the Financial AI Equity Research system.
 
-Orchestrates market data fetching (Phase 1), technical indicator calculations (Phase 2),
-financial summary generation & news retrieval (Phase 3), LLM sentiment analysis (Phase 4),
-and LLM trading recommendation reasoning (Phase 5).
+High-level orchestrator connecting data retrieval, feature engineering, financial summary,
+news sentiment extraction, and LLM trading recommendation reasoning.
+Contains zero indicator math, zero raw prompt strings, and zero raw API requests.
 """
 
-from typing import Any, Dict, Tuple
+import logging
+from typing import Any, Dict, Optional
 import pandas as pd
 
 from src.config import config
 from src.data.market_data import fetch_market_data
-from src.data.news_data import fetch_news_data
+from src.data.news_data import NewsDataError, fetch_news_data
 from src.features.summary import generate_financial_summary
 from src.features.technical_indicators import calculate_indicators
+from src.llm.client import LLMClient
 from src.llm.sentiment import analyze_batch_sentiment
 from src.llm.signal import generate_trading_signal
-from src.schemas.models import AggregatedSentiment, TradingRecommendation
+from src.schemas.models import (
+    AggregatedSentiment,
+    FinancialPipelineResult,
+    TradingRecommendation,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def extract_latest_indicators(df_indicators: pd.DataFrame) -> Dict[str, Optional[float]]:
+    """
+    Extract latest row of technical indicator values into a clean float dictionary.
+
+    Args:
+        df_indicators: DataFrame with indicator columns.
+
+    Returns:
+        Dict[str, Optional[float]]: Key-value pairs of indicator names and latest values.
+    """
+    if df_indicators.empty:
+        return {}
+
+    latest_row = df_indicators.iloc[-1]
+    indicator_cols = [
+        "Close", "SMA_50", "SMA_200", "RSI_14",
+        "MACD_Line", "MACD_Signal", "MACD_Hist",
+        "BB_Middle", "BB_Upper", "BB_Lower"
+    ]
+
+    result: Dict[str, Optional[float]] = {}
+    for col in indicator_cols:
+        if col in latest_row:
+            val = latest_row[col]
+            result[col] = round(float(val), 4) if pd.notna(val) else None
+        else:
+            result[col] = None
+
+    return result
 
 
 def run_pipeline(
     ticker: str = config.DEFAULT_TICKER,
     years: int = config.LOOKBACK_YEARS,
     news_limit: int = config.NEWS_HEADLINES_LIMIT,
-) -> Tuple[pd.DataFrame, Dict[str, Any], list, AggregatedSentiment, TradingRecommendation]:
+    client: Optional[LLMClient] = None,
+) -> FinancialPipelineResult:
     """
-    Run full end-to-end Task 1 pipeline (Phase 1 through Phase 5).
+    Execute the complete end-to-end Financial AI Equity Research pipeline.
+
+    Orchestration Flow:
+        1. Fetch daily OHLCV market data (Phase 1).
+        2. Calculate technical indicators (Phase 2).
+        3. Generate financial summary & fetch news headlines (Phase 3).
+        4. Run LLM news sentiment analysis & aggregation (Phase 4).
+        5. Synthesize LLM trading recommendation signal (Phase 5).
+        6. Validate & assemble final FinancialPipelineResult.
 
     Args:
-        ticker: Target stock ticker symbol.
-        years: Market data lookback years.
-        news_limit: Headline count limit.
+        ticker: Target equity ticker symbol.
+        years: Market data lookback period in years.
+        news_limit: Maximum headlines to retrieve.
+        client: Optional LLMClient instance.
 
     Returns:
-        Tuple[pd.DataFrame, Dict[str, Any], list, AggregatedSentiment, TradingRecommendation]:
-            (Market DataFrame, Summary Dict, News List, Aggregated Sentiment, Trading Recommendation)
+        FinancialPipelineResult: Validated end-to-end pipeline result object.
     """
+    clean_ticker = ticker.strip().upper()
     print("=" * 80)
-    print(f"1. Fetching Market Data for Ticker: '{ticker}' ({years} years lookback)...")
-    df_market = fetch_market_data(ticker=ticker, years=years)
-    print(f"   Success! Fetched {len(df_market)} daily OHLCV bars.")
+    print(f"🚀 Starting Financial AI Pipeline Execution for '{clean_ticker}'...")
 
-    print("\n2. Computing Technical Indicators (SMA, RSI, MACD, Bollinger Bands)...")
+    # 1. Market Data Retrieval (Phase 1)
+    print(f"\n[1/5] Fetching Market Data ({years} years lookback)...")
+    df_market = fetch_market_data(ticker=clean_ticker, years=years)
+    print(f"      Fetched {len(df_market)} daily OHLCV bars ({df_market.index.min().strftime('%Y-%m-%d')} to {df_market.index.max().strftime('%Y-%m-%d')}).")
+
+    # 2. Technical Indicator Calculation (Phase 2)
+    print("\n[2/5] Calculating Technical Indicators (SMA, RSI, MACD, Bollinger Bands)...")
     df_indicators = calculate_indicators(df_market)
-    print(f"   Success! Final DataFrame shape: {df_indicators.shape}")
+    print(f"      Calculated indicators. Data shape: {df_indicators.shape}.")
 
-    print("\n3. Generating Financial Summary & Deterministic Momentum Signal...")
-    summary = generate_financial_summary(ticker=ticker, df=df_indicators)
-    for key, val in summary.items():
-        print(f"   - {key}: {val}")
+    # 3. Financial Summary & News Retrieval (Phase 3)
+    print("\n[3/5] Generating Financial Summary & Retrieving News...")
+    summary = generate_financial_summary(ticker=clean_ticker, df=df_indicators)
 
-    print(f"\n4. Retrieving & Normalizing News Headlines (Target: {news_limit})...")
-    news_list = fetch_news_data(ticker=ticker, limit=news_limit)
-    print(f"   Success! Retrieved {len(news_list)} normalized headlines.")
+    news_list = []
+    try:
+        news_list = fetch_news_data(ticker=clean_ticker, limit=news_limit)
+        print(f"      Retrieved {len(news_list)} normalized news headlines.")
+    except NewsDataError as news_err:
+        logger.warning(f"News retrieval failed for '{clean_ticker}': {news_err}. Proceeding with empty news list.")
+        print(f"      News retrieval warning: {news_err}. Proceeding without news.")
 
-    print("\n5. Running LLM News Sentiment Analysis & Confidence-Weighted Aggregation...")
-    sentiment_result = analyze_batch_sentiment(news_list, ticker=ticker)
-    print(f"   - Overall Sentiment Label: {sentiment_result.overall_label}")
-    print(f"   - Weighted Sentiment Score: {sentiment_result.weighted_sentiment_score:.4f}")
+    # 4. LLM News Sentiment Analysis (Phase 4)
+    print("\n[4/5] Running LLM News Sentiment Analysis & Aggregation...")
+    sentiment_result: AggregatedSentiment = analyze_batch_sentiment(
+        headlines=news_list,
+        ticker=clean_ticker,
+        client=client
+    )
+    print(f"      Overall Sentiment: {sentiment_result.overall_label} (Score: {sentiment_result.weighted_sentiment_score:.4f})")
 
-    print("\n6. Synthesizing LLM Trading Recommendation & Evidence-Based Reasoning...")
+    # 5. LLM Trading Recommendation (Phase 5)
+    print("\n[5/5] Synthesizing LLM Trading Recommendation & Reasoning...")
     latest_row = df_indicators.iloc[-1]
-    recommendation = generate_trading_signal(
-        ticker=ticker,
+    recommendation: TradingRecommendation = generate_trading_signal(
+        ticker=clean_ticker,
         summary=summary,
         latest_indicators=latest_row,
-        news_sentiment=sentiment_result
+        news_sentiment=sentiment_result,
+        client=client
     )
-    print(f"   - RECOMMENDATION: {recommendation.recommendation}")
-    print(f"   - REASONING: {recommendation.reasoning}")
+    print(f"      Recommendation: {recommendation.recommendation}")
+    print(f"      Reasoning: {recommendation.reasoning}")
+
+    # Extract latest indicators dictionary
+    latest_indicators_dict = extract_latest_indicators(df_indicators)
+
+    # Assemble and validate final Pydantic result model
+    result = FinancialPipelineResult(
+        ticker=clean_ticker,
+        market_summary=summary,
+        latest_technical_indicators=latest_indicators_dict,
+        news_sentiment=sentiment_result,
+        recommendation=recommendation
+    )
+
+    print("\n✅ Pipeline execution completed successfully!")
     print("=" * 80)
 
-    return df_indicators, summary, news_list, sentiment_result, recommendation
+    return result
 
 
 if __name__ == "__main__":

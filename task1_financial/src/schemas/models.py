@@ -2,11 +2,11 @@
 Pydantic data models for structured output validation.
 
 Defines strict validation schemas for headline sentiment outputs, aggregated sentiment analysis,
-and LLM-based trading recommendations.
+trading recommendations, and final pipeline execution results.
 """
 
 import re
-from typing import List, Literal
+from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
 
 # Allowed sentiment classifications
@@ -86,11 +86,25 @@ class TradingRecommendation(BaseModel):
         if not cleaned:
             raise ValueError("Reasoning text cannot be empty.")
 
-        # Split text into sentences using punctuation terminators (. ! ?)
-        sentences = [s.strip() for s in re.split(r"[.!?]+", cleaned) if s.strip()]
+        # Split sentences strictly on punctuation followed by whitespace (prevents splitting decimal numbers like 200.0)
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", cleaned) if s.strip()]
         sentence_count = len(sentences)
 
         if sentence_count < 3 or sentence_count > 6:  # Allow slight tolerance up to 6
             raise ValueError(f"Reasoning must contain between 3 and 5 sentences (got {sentence_count}).")
 
         return cleaned
+
+
+class FinancialPipelineResult(BaseModel):
+    """
+    End-to-end structured result returned by the financial AI research pipeline.
+    """
+
+    ticker: str = Field(..., min_length=1, description="Target equity ticker symbol.")
+    market_summary: Dict[str, Any] = Field(..., description="Financial summary dictionary.")
+    latest_technical_indicators: Dict[str, Optional[float]] = Field(
+        ..., description="Dictionary of latest calculated technical indicator values."
+    )
+    news_sentiment: AggregatedSentiment = Field(..., description="Aggregated news sentiment analysis result.")
+    recommendation: TradingRecommendation = Field(..., description="Validated LLM trading recommendation.")
