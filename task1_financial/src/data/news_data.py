@@ -1,7 +1,6 @@
 """
-Financial news scraping and fetching utilities.
-"""
+News data retrieval module.
 
-def fetch_news_data(ticker: str):
-    """Fetch recent news articles for a given ticker."""
-    pass
+This module will handle retrieving recent financial news headlines for sentiment analysis.
+
+"""

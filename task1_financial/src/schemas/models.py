@@ -1,14 +1,6 @@
 """
-Pydantic data models for API responses, sentiments, and recommendations.
+Pydantic data models for structured output validation.
+
+Will define validation models for headline sentiment output and recommendation signals.
+(Implementation deferred to future phase).
 """
-from pydantic import BaseModel
-from typing import Optional, List
-
-class SentimentResponse(BaseModel):
-    score: float
-    reasoning: str
-    confidence: float
-
-class RecommendationResponse(BaseModel):
-    action: str  # BUY, SELL, HOLD
-    summary: str

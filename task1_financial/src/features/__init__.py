@@ -1,3 +1,3 @@
 """
-Feature engineering module.
+Feature engineering package for financial indicator calculations.
 """

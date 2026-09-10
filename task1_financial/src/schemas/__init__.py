@@ -1,3 +1,3 @@
 """
-Pydantic schemas and data models.
+Schemas and Pydantic validation models package.
 """

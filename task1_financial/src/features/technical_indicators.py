@@ -1,7 +1,7 @@
 """
-Technical analysis indicator calculations (RMA, Moving Averages, MACD, etc.).
-"""
+Technical analysis indicator calculation module.
 
-def calculate_indicators(data):
-    """Calculate technical indicators on market data."""
-    pass
+Will compute SMA-50, SMA-200, RSI-14, MACD (12, 26, 9), and Bollinger Bands (20, 2)
+using pure Python/pandas/numpy without external TA-Lib dependencies.
+
+"""

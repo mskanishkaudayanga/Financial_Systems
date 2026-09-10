@@ -1,7 +1,5 @@
 """
-LLM-based sentiment analysis for financial text.
-"""
+Per-headline financial news sentiment analysis using LLM.
 
-def analyze_sentiment(news_text: str):
-    """Analyze sentiment from news text."""
-    pass
+
+"""

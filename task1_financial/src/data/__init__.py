@@ -1,3 +1,3 @@
 """
-Data ingestion module for market and news data.
+Data acquisition package for market prices and financial news.
 """

@@ -1,10 +1,6 @@
 """
-LLM Client initialization and provider configuration.
+LLM Client Wrapper.
+
+Provides an abstraction interface for invoking LLM services with structured outputs and error handling.
+
 """
-
-class LLMClient:
-    def __init__(self, api_key: str = None):
-        self.api_key = api_key
-
-    def generate(self, prompt: str) -> str:
-        pass

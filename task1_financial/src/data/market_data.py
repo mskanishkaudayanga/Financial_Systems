@@ -1,7 +1,6 @@
 """
-Market data fetching and processing utilities.
-"""
+Market data retrieval module using yfinance.
 
-def fetch_market_data(ticker: str):
-    """Fetch financial market data for a given ticker."""
-    pass
+This module will handle fetching historical daily OHLCV price data.
+
+"""

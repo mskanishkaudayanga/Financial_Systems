@@ -1,7 +1,5 @@
 """
-Trading signal synthesis combining technical indicators and sentiment scores.
-"""
+Trading signal generation module (Buy/Hold/Sell) using LLM reasoning over technical indicators and sentiment analysis.
 
-def generate_signal(market_data, sentiment_score):
-    """Generate buy/sell/hold signal."""
-    pass
+
+"""

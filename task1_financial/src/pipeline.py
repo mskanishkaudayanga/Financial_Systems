@@ -1,9 +1,16 @@
 """
-Main execution pipeline for financial analysis and signals.
+Main execution pipeline for financial analysis and signal generation.
+
+Orchestrates data fetching, technical indicator calculations, LLM sentiment extraction,
+and recommendation formatting.
+(Implementation deferred to future phase).
 """
 
-def main():
-    print("Financial analysis pipeline initialized.")
+
+def run_pipeline() -> None:
+    """Main pipeline execution function stub."""
+    pass
+
 
 if __name__ == "__main__":
-    main()
+    run_pipeline()
