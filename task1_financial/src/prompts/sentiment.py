@@ -12,11 +12,11 @@ Your task is to analyze financial news headlines for a given stock ticker and ou
 You MUST respond strictly with a valid JSON object. Do not include markdown formatting outside the JSON object.
 
 JSON Schema:
-{
+{{
   "sentiment": "positive" | "negative" | "neutral",
   "confidence": <float between 0.0 and 1.0>,
   "brief_reason": "<1-2 sentence explanation>"
-}
+}}
 
 Rules:
 1. "sentiment" must be exactly one of: "positive", "negative", or "neutral".
@@ -40,12 +40,12 @@ You MUST respond strictly with a valid JSON array containing one object per head
 
 JSON Output Schema:
 [
-  {
+  {{
     "headline": "<exact headline text>",
     "sentiment": "positive" | "negative" | "neutral",
     "confidence": <float between 0.0 and 1.0>,
     "brief_reason": "<1-2 sentence explanation>"
-  }
+  }}
 ]
 
 Rules:

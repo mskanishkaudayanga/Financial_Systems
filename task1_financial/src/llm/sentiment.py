@@ -99,7 +99,7 @@ def analyze_headline_sentiment(
 
     llm_client = client if client is not None else LLMClient()
 
-    system_prompt = SENTIMENT_SYSTEM_PROMPT.format(ticker=ticker.upper())
+    system_prompt = SENTIMENT_SYSTEM_PROMPT.replace("{ticker}", ticker.upper())
     user_prompt = SENTIMENT_USER_PROMPT_TEMPLATE.format(ticker=ticker.upper(), headline=headline)
 
     try:
@@ -216,7 +216,7 @@ def analyze_batch_sentiment(
 
     # Format all headlines into a single prompt string
     formatted_headlines_list = "\n".join([f"{idx+1}. \"{h}\"" for idx, h in enumerate(headline_texts)])
-    system_prompt = BATCH_SENTIMENT_SYSTEM_PROMPT.format(ticker=ticker.upper())
+    system_prompt = BATCH_SENTIMENT_SYSTEM_PROMPT.replace("{ticker}", ticker.upper())
     user_prompt = BATCH_SENTIMENT_USER_PROMPT_TEMPLATE.format(
         ticker=ticker.upper(),
         headlines_formatted=formatted_headlines_list

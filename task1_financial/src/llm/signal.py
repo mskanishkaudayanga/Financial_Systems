@@ -48,11 +48,15 @@ def create_fallback_trading_recommendation(
     sma_50 = latest_indicators.get("SMA_50", "N/A")
     rsi = latest_indicators.get("RSI_14", "N/A")
 
+    close_str = f"${float(close):.2f}" if isinstance(close, (int, float)) else str(close)
+    sma_str = f"${float(sma_50):.2f}" if isinstance(sma_50, (int, float)) else str(sma_50)
+    rsi_str = f"{float(rsi):.2f}" if isinstance(rsi, (int, float)) else str(rsi)
+
     reasoning = (
         f"Automated deterministic fallback recommendation for {ticker.upper()} is set to {rec} based on technical alignment. "
-        f"The current price is ${close} relative to a 50-day moving average of ${sma_50} and an RSI of {rsi}. "
-        f"Pre-calculated technical momentum is categorized as {momentum}. "
-        f"This fallback ensures continuous operation while LLM reasoning is temporarily unavailable."
+        f"The current price of {close_str} is evaluated against a 50-day moving average of {sma_str} and an RSI reading of {rsi_str}. "
+        f"Pre-calculated technical momentum for the asset is currently categorized as {momentum}. "
+        f"This fallback ensures continuous system operation while LLM reasoning is temporarily unavailable."
     )
 
     return TradingRecommendation(

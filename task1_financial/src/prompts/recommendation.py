@@ -14,10 +14,10 @@ DISCLAIMER: This output is for automated technical analysis evaluation and resea
 You MUST respond strictly with a valid JSON object. Do not include markdown formatting outside the JSON object.
 
 JSON Schema:
-{
+{{
   "recommendation": "BUY" | "HOLD" | "SELL",
   "reasoning": "<Exactly 3 to 5 sentences synthesizing combinations of indicators>"
-}
+}}
 
 Critical Instructions for Reasoning:
 1. Combination-Based Synthesis: You MUST reason over COMBINATIONS of indicators rather than simply listing standalone numbers. Synthesize relationships such as:
