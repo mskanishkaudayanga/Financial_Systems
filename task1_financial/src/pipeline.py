@@ -24,6 +24,7 @@ def run_pipeline(ticker: str = config.DEFAULT_TICKER, years: int = config.LOOKBA
     print(f"1. Fetching Market Data for Ticker: '{ticker}' ({years} years lookback)...")
     df_market = fetch_market_data(ticker=ticker, years=years)
     print(f"   Success! Fetched {len(df_market)} daily OHLCV bars.")
+    print(df_market.head())
     print(f"   Date Range: {df_market.index.min().strftime('%Y-%m-%d')} to {df_market.index.max().strftime('%Y-%m-%d')}")
 
     print("\n2. Computing Technical Indicators (SMA-50, SMA-200, RSI-14, MACD, Bollinger Bands)...")
