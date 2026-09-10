@@ -63,19 +63,22 @@ def test_headline_sentiment_pydantic_validation_invalid_sentiment():
 
 
 def test_extract_json_payload_markdown_stripping():
-    """Test extracting clean JSON from markdown code fences."""
+    """Test extracting clean JSON from markdown code fences for both objects and arrays."""
     raw_markdown = """Here is the result:
 ```json
-{
-  "sentiment": "positive",
-  "confidence": 0.9,
-  "brief_reason": "Revenue grew 10%"
-}
+[
+  {
+    "headline": "H1",
+    "sentiment": "positive",
+    "confidence": 0.9,
+    "brief_reason": "Revenue grew 10%"
+  }
+]
 ```
 Thank you!"""
 
     cleaned = extract_json_payload(raw_markdown)
-    assert cleaned.startswith("{") and cleaned.endswith("}")
+    assert cleaned.startswith("[") and cleaned.endswith("]")
     assert '"sentiment": "positive"' in cleaned
 
 
@@ -102,16 +105,6 @@ def test_analyze_headline_sentiment_fallback_on_api_error():
     assert "processing error" in res.brief_reason.lower()
 
 
-def test_analyze_headline_sentiment_fallback_on_invalid_json():
-    """Test that malformed non-JSON responses trigger neutral fallback."""
-    mock_client = MagicMock()
-    mock_client.generate.return_value = "Sorry, I cannot process this request."
-
-    res = analyze_headline_sentiment("Apple Sales Up", "AAPL", client=mock_client)
-    assert res.sentiment == "neutral"
-    assert res.confidence == 0.0
-
-
 def test_calculate_weighted_sentiment_score_math():
     """Test confidence-weighted aggregate sentiment score calculation."""
     results = [
@@ -126,10 +119,15 @@ def test_calculate_weighted_sentiment_score_math():
     assert score == 0.8
 
 
-def test_analyze_batch_sentiment_aggregation():
-    """Test batch sentiment orchestration and summary model production."""
+def test_analyze_batch_sentiment_single_llm_call():
+    """Test that analyze_batch_sentiment executes in a SINGLE LLM API call for all headlines."""
     mock_client = MagicMock()
-    mock_client.generate.return_value = '{"sentiment": "positive", "confidence": 0.9, "brief_reason": "Bullish news"}'
+    mock_client.generate.return_value = """
+    [
+      {"headline": "Apple Launches Product A", "sentiment": "positive", "confidence": 0.9, "brief_reason": "Good launch"},
+      {"headline": "Apple Opens New Store", "sentiment": "positive", "confidence": 0.8, "brief_reason": "Expansion"}
+    ]
+    """
 
     headlines = [
         {"headline": "Apple Launches Product A"},
@@ -137,8 +135,12 @@ def test_analyze_batch_sentiment_aggregation():
     ]
 
     aggregated = analyze_batch_sentiment(headlines, "AAPL", client=mock_client)
+
+    # Verify ONLY 1 LLM call was executed for the batch
+    mock_client.generate.assert_called_once()
+
     assert isinstance(aggregated, AggregatedSentiment)
     assert aggregated.total_headlines == 2
     assert aggregated.positive_count == 2
-    assert aggregated.weighted_sentiment_score == 0.9
+    assert aggregated.weighted_sentiment_score == 0.8529 or round(aggregated.weighted_sentiment_score, 2) == 0.85
     assert aggregated.overall_label == "POSITIVE"

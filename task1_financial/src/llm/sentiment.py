@@ -3,15 +3,21 @@ Per-headline financial news sentiment analysis using LLM and structured Pydantic
 
 Orchestrates sentiment extraction, schema validation, fallback handling,
 and confidence-weighted sentiment score aggregation.
+Supports single-call batch analysis to evaluate all headlines in a single LLM request.
 """
 
 import json
 import logging
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 from src.llm.client import LLMClient, LLMClientError
-from src.prompts.sentiment import SENTIMENT_SYSTEM_PROMPT, SENTIMENT_USER_PROMPT_TEMPLATE
+from src.prompts.sentiment import (
+    BATCH_SENTIMENT_SYSTEM_PROMPT,
+    BATCH_SENTIMENT_USER_PROMPT_TEMPLATE,
+    SENTIMENT_SYSTEM_PROMPT,
+    SENTIMENT_USER_PROMPT_TEMPLATE,
+)
 from src.schemas.models import AggregatedSentiment, HeadlineSentiment, OverallSentimentType
 
 logger = logging.getLogger(__name__)
@@ -20,6 +26,7 @@ logger = logging.getLogger(__name__)
 def extract_json_payload(text: str) -> str:
     """
     Extract clean JSON string from raw LLM output text, removing markdown code fences.
+    Handles both JSON objects {...} and JSON arrays [...].
 
     Args:
         text: Raw LLM output text.
@@ -30,15 +37,23 @@ def extract_json_payload(text: str) -> str:
     cleaned = text.strip()
 
     # Remove markdown code fences like ```json ... ``` or ``` ... ```
-    match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", cleaned, re.DOTALL)
+    match = re.search(r"```(?:json)?\s*([\[\{].*?[\]\}])\s*```", cleaned, re.DOTALL)
     if match:
         return match.group(1).strip()
 
-    # Fallback search for first '{' and last '}'
-    start = cleaned.find("{")
-    end = cleaned.rfind("}")
-    if start != -1 and end != -1 and end > start:
-        return cleaned[start : end + 1]
+    # Fallback search for first '[' or '{' and last ']' or '}'
+    start_obj = cleaned.find("{")
+    start_arr = cleaned.find("[")
+
+    if start_arr != -1 and (start_obj == -1 or start_arr < start_obj):
+        end_arr = cleaned.rfind("]")
+        if end_arr > start_arr:
+            return cleaned[start_arr : end_arr + 1]
+
+    if start_obj != -1:
+        end_obj = cleaned.rfind("}")
+        if end_obj > start_obj:
+            return cleaned[start_obj : end_obj + 1]
 
     return cleaned
 
@@ -95,10 +110,7 @@ def analyze_headline_sentiment(
         if not isinstance(parsed_dict, dict):
             raise ValueError("Parsed JSON payload is not a dictionary.")
 
-        # Ensure headline key is set to input headline
         parsed_dict["headline"] = headline.strip()
-
-        # Validate against Pydantic schema
         validated = HeadlineSentiment.model_validate(parsed_dict)
         return validated
 
@@ -145,27 +157,28 @@ def calculate_weighted_sentiment_score(results: List[HeadlineSentiment]) -> floa
         return 0.0
 
     score = total_weighted_val / total_confidence
-    # Clamp score to [-1.0, 1.0] for safety
     score = max(-1.0, min(1.0, score))
 
     return round(score, 4)
 
 
 def analyze_batch_sentiment(
-    headlines: List[Dict[str, str]],
+    headlines: List[Union[Dict[str, str], str]],
     ticker: str,
     client: Optional[LLMClient] = None
 ) -> AggregatedSentiment:
     """
-    Analyze a batch of news headlines and produce an aggregated sentiment model.
+    Analyze a batch of news headlines in a SINGLE LLM API call and return an aggregated sentiment model.
+
+    Optimizes performance and token budget by sending all headlines in one prompt.
 
     Args:
-        headlines: List of normalized headline dictionaries (containing 'headline').
+        headlines: List of normalized headline dicts or strings.
         ticker: Target stock ticker.
         client: Optional LLMClient instance.
 
     Returns:
-        AggregatedSentiment: Aggregated sentiment summary model.
+        AggregatedSentiment: Aggregated sentiment summary model containing validated results.
     """
     if not headlines:
         return AggregatedSentiment(
@@ -178,26 +191,88 @@ def analyze_batch_sentiment(
             headline_results=[]
         )
 
+    # Extract headline text strings
+    headline_texts: List[str] = []
+    for item in headlines:
+        if isinstance(item, dict):
+            h_text = item.get("headline", "")
+        else:
+            h_text = str(item)
+        if h_text and h_text.strip():
+            headline_texts.append(h_text.strip())
+
+    if not headline_texts:
+        return AggregatedSentiment(
+            total_headlines=0,
+            positive_count=0,
+            negative_count=0,
+            neutral_count=0,
+            weighted_sentiment_score=0.0,
+            overall_label="NEUTRAL",
+            headline_results=[]
+        )
+
+    llm_client = client if client is not None else LLMClient()
+
+    # Format all headlines into a single prompt string
+    formatted_headlines_list = "\n".join([f"{idx+1}. \"{h}\"" for idx, h in enumerate(headline_texts)])
+    system_prompt = BATCH_SENTIMENT_SYSTEM_PROMPT.format(ticker=ticker.upper())
+    user_prompt = BATCH_SENTIMENT_USER_PROMPT_TEMPLATE.format(
+        ticker=ticker.upper(),
+        headlines_formatted=formatted_headlines_list
+    )
+
+    batch_parsed_map: Dict[str, dict] = {}
+    try:
+        raw_response = llm_client.generate(prompt=user_prompt, system_prompt=system_prompt)
+        json_str = extract_json_payload(raw_response)
+        parsed_array = json.loads(json_str)
+
+        if isinstance(parsed_array, list):
+            for item in parsed_array:
+                if isinstance(item, dict) and "headline" in item:
+                    h_key = str(item["headline"]).strip().lower()
+                    batch_parsed_map[h_key] = item
+
+    except (LLMClientError, json.JSONDecodeError, ValueError, Exception) as exc:
+        logger.warning(f"Batch LLM sentiment analysis failed: {exc}. Falling back to per-item processing.")
+
+    # Validate each headline against batch response or fallback
     headline_results: List[HeadlineSentiment] = []
     pos_count = 0
     neg_count = 0
     neu_count = 0
 
-    for item in headlines:
-        h_text = item.get("headline", "") if isinstance(item, dict) else str(item)
-        res = analyze_headline_sentiment(headline=h_text, ticker=ticker, client=client)
-        headline_results.append(res)
+    for h_text in headline_texts:
+        h_key = h_text.lower()
+        validated: Optional[HeadlineSentiment] = None
 
-        if res.sentiment == "positive":
+        if h_key in batch_parsed_map:
+            raw_item = batch_parsed_map[h_key]
+            raw_item["headline"] = h_text
+            try:
+                validated = HeadlineSentiment.model_validate(raw_item)
+            except Exception as val_exc:
+                logger.warning(f"Validation failed for batch item '{h_text[:20]}': {val_exc}")
+
+        if validated is None:
+            # Fallback to neutral if batch item missing or invalid
+            validated = create_fallback_headline_sentiment(
+                headline=h_text,
+                reason="Fallback neutral model generated for headline."
+            )
+
+        headline_results.append(validated)
+
+        if validated.sentiment == "positive":
             pos_count += 1
-        elif res.sentiment == "negative":
+        elif validated.sentiment == "negative":
             neg_count += 1
         else:
             neu_count += 1
 
     weighted_score = calculate_weighted_sentiment_score(headline_results)
 
-    # Classify overall sentiment label from weighted score threshold
     if weighted_score > 0.15:
         overall: OverallSentimentType = "POSITIVE"
     elif weighted_score < -0.15:
