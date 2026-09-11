@@ -1,4 +1,4 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Implement web_search tool using duckduckgo_search DDGS with query validation, payload normalization, and exception handling', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Convert web_search into a LangChain @tool with WebSearchArgs Pydantic input schema and explicit LLM tool description', Date: 2026-09-11
 """
 Web Search Tool.
 
@@ -8,21 +8,14 @@ SEC filings, or market intelligence, returning normalized structured outputs.
 
 from typing import Dict, Any, List
 from duckduckgo_search import DDGS
+from langchain_core.tools import tool
 
-from src.schemas.tools_schemas import WebSearchOutput, SearchResultItem
+from src.schemas.tools_schemas import WebSearchOutput, SearchResultItem, WebSearchArgs
 
 
+@tool(args_schema=WebSearchArgs)
 def web_search(query: str, max_results: int = 5) -> Dict[str, Any]:
-    """
-    Search the web for financial news, analyst commentary, or market data via DuckDuckGo.
-
-    Args:
-        query: Search query string (e.g., 'AAPL earnings analyst commentary 2026').
-        max_results: Maximum number of search results to return (default 5).
-
-    Returns:
-        Dict[str, Any]: Serialized dictionary conforming to WebSearchOutput schema.
-    """
+    """Search the web via DuckDuckGo for financial news, analyst price targets, market commentary, or company intelligence. Use this tool when official market news or price metrics are insufficient and broader web research is required."""
     # 1. Validate inputs
     if not query or not isinstance(query, str) or not query.strip():
         return WebSearchOutput(

@@ -1,4 +1,4 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Implement get_news tool using yfinance news with structured normalization and defensive error handling', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Convert get_news into a LangChain @tool with GetNewsArgs Pydantic input schema and explicit LLM tool description', Date: 2026-09-11
 """
 Financial News Tool.
 
@@ -9,21 +9,14 @@ normalizes news payloads across API version schemas, and returns structured data
 from typing import Dict, Any, List
 from datetime import datetime
 import yfinance as yf
+from langchain_core.tools import tool
 
-from src.schemas.tools_schemas import NewsOutput, NewsItem
+from src.schemas.tools_schemas import NewsOutput, NewsItem, GetNewsArgs
 
 
+@tool(args_schema=GetNewsArgs)
 def get_news(ticker: str, n: int = 10) -> Dict[str, Any]:
-    """
-    Retrieve recent financial news items for a specified equity ticker.
-
-    Args:
-        ticker: Equity ticker symbol (e.g., 'AAPL', 'MSFT', 'GOOGL').
-        n: Maximum number of news articles to return (default 10).
-
-    Returns:
-        Dict[str, Any]: Serialized dictionary conforming to NewsOutput schema.
-    """
+    """Retrieve recent financial market news articles and headlines for a given equity ticker symbol. Use this tool when you need recent news coverage, corporate announcements, press releases, or qualitative news context for a company."""
     # 1. Validate inputs
     if not ticker or not isinstance(ticker, str) or not ticker.strip():
         return NewsOutput(

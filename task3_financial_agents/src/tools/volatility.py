@@ -1,4 +1,4 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Implement calculate_volatility tool computing annualized volatility (std * sqrt(252)) directly via yfinance with window validation and error handling', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Convert calculate_volatility into a LangChain @tool with CalculateVolatilityArgs Pydantic input schema and explicit LLM tool description', Date: 2026-09-11
 """
 Volatility Calculation Tool.
 
@@ -10,26 +10,14 @@ from typing import Dict, Any
 import numpy as np
 import pandas as pd
 import yfinance as yf
+from langchain_core.tools import tool
 
-from src.schemas.tools_schemas import VolatilityOutput
+from src.schemas.tools_schemas import VolatilityOutput, CalculateVolatilityArgs
 
 
+@tool(args_schema=CalculateVolatilityArgs)
 def calculate_volatility(ticker: str, window: int = 252) -> Dict[str, Any]:
-    """
-    Calculate the annualized historical volatility for a given ticker over a window.
-
-    Mathematical Formulation:
-        Daily Return: R_t = (Close_t - Close_{t-1}) / Close_{t-1}
-        Daily Volatility: \sigma_{daily} = std(R_t)
-        Annualized Volatility: \sigma_{annualized} = \sigma_{daily} \times \sqrt{252}
-
-    Args:
-        ticker: Equity ticker symbol (e.g., 'AAPL', 'MSFT').
-        window: Number of historical trading days to evaluate (default 252).
-
-    Returns:
-        Dict[str, Any]: Serialized dictionary conforming to VolatilityOutput schema.
-    """
+    """Calculate the annualized historical volatility and daily return standard deviation for an equity ticker over a specified trading window. Use this tool when evaluating stock risk, return variance, or price volatility."""
     # 1. Validate inputs
     if not ticker or not isinstance(ticker, str) or not ticker.strip():
         return VolatilityOutput(

@@ -1,4 +1,4 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Implement get_price_data tool using yfinance with SMA20, SMA50, EMA20, RSI14, daily return calculations and defensive error handling', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Convert get_price_data into a LangChain @tool with GetPriceDataArgs Pydantic input schema and explicit LLM tool description', Date: 2026-09-11
 """
 Market Price Data Tool.
 
@@ -11,8 +11,9 @@ from typing import Dict, Any, List
 import pandas as pd
 import numpy as np
 import yfinance as yf
+from langchain_core.tools import tool
 
-from src.schemas.tools_schemas import PriceDataOutput, OHLCVRecord, TechnicalIndicators
+from src.schemas.tools_schemas import PriceDataOutput, OHLCVRecord, TechnicalIndicators, GetPriceDataArgs
 
 VALID_PERIODS = {"1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"}
 
@@ -40,18 +41,9 @@ def _calculate_rsi(series: pd.Series, period: int = 14) -> pd.Series:
     return rsi.fillna(50.0)
 
 
+@tool(args_schema=GetPriceDataArgs)
 def get_price_data(ticker: str, period: str = "1y") -> Dict[str, Any]:
-    """
-    Retrieve historical OHLCV market data and calculate technical indicators.
-
-    Args:
-        ticker: Equity symbol (e.g., 'AAPL', 'MSFT', 'NVDA').
-        period: Historical lookback period (default '1y').
-                Valid options: '1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max'.
-
-    Returns:
-        Dict[str, Any]: Serialized dictionary conforming to PriceDataOutput schema.
-    """
+    """Fetch historical OHLCV equity market price data and calculate key technical indicators (SMA20, SMA50, EMA20, RSI14, daily_return). Use this tool when you need stock price trends, moving averages, relative strength index, or technical momentum analysis for an equity ticker."""
     # 1. Validate inputs
     if not ticker or not isinstance(ticker, str) or not ticker.strip():
         return PriceDataOutput(

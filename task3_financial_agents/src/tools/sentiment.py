@@ -1,4 +1,4 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Implement llm_sentiment tool using LangChain ChatOpenAI with structured output Pydantic model and defensive fallback handling', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Convert llm_sentiment into a LangChain @tool with LLMSentimentArgs Pydantic input schema and explicit LLM tool description', Date: 2026-09-11
 """
 LLM News Sentiment Tool.
 
@@ -10,21 +10,15 @@ and reasoning with defensive fallback handling.
 from typing import Dict, Any, List
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.tools import tool
 
 from src.config import config
-from src.schemas.tools_schemas import SentimentResult, SentimentOutput
+from src.schemas.tools_schemas import SentimentResult, SentimentOutput, LLMSentimentArgs
 
 
+@tool(args_schema=LLMSentimentArgs)
 def llm_sentiment(headlines: List[str]) -> Dict[str, Any]:
-    """
-    Analyze news headlines using configured LLM to generate structured financial sentiment metrics.
-
-    Args:
-        headlines: List of news headline strings.
-
-    Returns:
-        Dict[str, Any]: Serialized dictionary conforming to SentimentOutput schema.
-    """
+    """Perform qualitative LLM sentiment analysis on a list of financial news headlines. Returns a sentiment score between -1.0 (bearish) and +1.0 (bullish), qualitative label ('Bullish', 'Bearish', 'Neutral'), confidence score, and rationale. Use this tool after retrieving news headlines to assess net market sentiment."""
     # 1. Validate inputs
     if not headlines or not isinstance(headlines, list):
         return SentimentOutput(

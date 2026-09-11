@@ -11,8 +11,69 @@ from pydantic import BaseModel, Field
 
 
 # ---------------------------------------------------------------------------
+# Tool Input Argument Schemas (for LangChain @tool args_schema)
+# ---------------------------------------------------------------------------
+
+class GetPriceDataArgs(BaseModel):
+    """Input argument schema for get_price_data tool."""
+
+    ticker: str = Field(
+        description="Equity ticker symbol (e.g. 'AAPL', 'MSFT', 'NVDA'). Must be a non-empty string."
+    )
+    period: str = Field(
+        default="1y",
+        description="Historical lookback period. Valid options: '1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max'."
+    )
+
+
+class GetNewsArgs(BaseModel):
+    """Input argument schema for get_news tool."""
+
+    ticker: str = Field(
+        description="Equity ticker symbol (e.g. 'AAPL', 'MSFT', 'GOOGL'). Must be a non-empty string."
+    )
+    n: int = Field(
+        default=10,
+        description="Maximum number of recent news articles to retrieve (positive integer, default 10)."
+    )
+
+
+class CalculateVolatilityArgs(BaseModel):
+    """Input argument schema for calculate_volatility tool."""
+
+    ticker: str = Field(
+        description="Equity ticker symbol (e.g. 'AAPL', 'TSLA'). Must be a non-empty string."
+    )
+    window: int = Field(
+        default=252,
+        description="Historical trading window length in days to compute volatility (minimum 5, default 252 for 1 year)."
+    )
+
+
+class LLMSentimentArgs(BaseModel):
+    """Input argument schema for llm_sentiment tool."""
+
+    headlines: List[str] = Field(
+        description="List of news headline strings to analyze for qualitative financial sentiment."
+    )
+
+
+class WebSearchArgs(BaseModel):
+    """Input argument schema for web_search tool."""
+
+    query: str = Field(
+        description="Search query string for market commentary, analyst notes, or financial research."
+    )
+    max_results: int = Field(
+        default=5,
+        description="Maximum number of search results to return (positive integer, default 5)."
+    )
+
+
+# ---------------------------------------------------------------------------
 # 1. Market Price Data Schemas
 # ---------------------------------------------------------------------------
+
 
 class OHLCVRecord(BaseModel):
     """Single trading session OHLCV data record with indicators."""

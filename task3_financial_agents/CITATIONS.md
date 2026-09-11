@@ -12,6 +12,9 @@ This document records AI assistance and external technical references used in de
 ### 2. Independent Research Tools Implementation (Phase 1)
 # AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Implement 5 independent financial research tools (get_price_data, get_news, calculate_volatility, llm_sentiment, web_search) with Pydantic schemas, defensive failure handling, type hints, and pytest coverage', Date: 2026-09-11
 
+### 3. LangChain Tool Integration & Schemas (Phase 2)
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Convert research functions into LangChain @tool objects with Pydantic args_schema, explicit tool descriptions, and LangChain invoke test coverage', Date: 2026-09-11
+
 ---
 
 ## 📚 Technical Documentation & Literature References
@@ -21,8 +24,8 @@ This document records AI assistance and external technical references used in de
    - Reference: https://python.langchain.com/docs/langgraph/
 
 2. **LangChain Core & Tool Interfaces**:
-   - Standard tool abstractions, BaseLanguageModel interfaces, and structured outputs.
-   - Reference: https://python.langchain.com/docs/core/
+   - `@tool` decorator, `BaseTool` abstractions, Pydantic `args_schema`, and tool JSON schemas.
+   - Reference: https://python.langchain.com/docs/core/tools/
 
 3. **Python-Dotenv Configuration Management**:
    - Environment variable isolation and local `.env` loading.
