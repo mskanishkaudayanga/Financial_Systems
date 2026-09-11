@@ -1,7 +1,18 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Initialize src/agents module placeholder for specialized financial agent nodes', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Re-export agent_node and execute_tools_node in src/agents/__init__.py', Date: 2026-09-11
 """
 Agents Package.
 
-Defines specialized agent nodes (e.g., Financial Analyst Agent, Technical Analyst Agent,
-Sentiment Agent, Synthesizer Agent) with specific prompt templates and tool bindings.
+Exposes autonomous financial research agent node and tool execution node.
 """
+
+from src.agents.research_agent import (
+    agent_node,
+    execute_tools_node,
+    RESEARCH_AGENT_SYSTEM_PROMPT,
+)
+
+__all__ = [
+    "agent_node",
+    "execute_tools_node",
+    "RESEARCH_AGENT_SYSTEM_PROMPT",
+]

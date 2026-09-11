@@ -1,7 +1,10 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Initialize src/observability module placeholder for agent trace logging and performance metrics', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Re-export log_trace_event in src/observability/__init__.py', Date: 2026-09-11
 """
 Observability Package.
 
-Provides agent execution tracing (JSONL logger), step-by-step state logging,
-latency measurement, and tool execution audit trails.
+Provides trace logging and agent audit event tracking.
 """
+
+from src.observability.tracer import log_trace_event
+
+__all__ = ["log_trace_event"]
