@@ -1,13 +1,14 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Create src/agents/research_agent.py implementing autonomous research agent node and custom tool execution node with trace logging', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Refine research_agent.py to emit concise 1-sentence decision summaries without private chain-of-thought for autonomous tool selection', Date: 2026-09-11
 """
 Autonomous Financial Research Agent Nodes.
 
 Implements the single agent node and custom tool node for autonomous financial research
-with integrated trace logging (AGENT, TOOL CALL, TOOL RESULT, AGENT DECISION).
+with integrated trace logging (AGENT, TOOL CALL, TOOL RESULT, AGENT DECISION)
+and concise 1-sentence decision summaries.
 """
 
 import json
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
 
@@ -19,15 +20,15 @@ from src.tools import (
     llm_sentiment,
     web_search,
 )
-from src.schemas.agent_schemas import AgentState, FinancialReportSchema
+from src.schemas.agent_schemas import AgentState
 from src.observability import log_trace_event
 
-# 1. Bind all 5 research tools
+# Bind all 5 research tools
 TOOLS = [get_price_data, get_news, calculate_volatility, llm_sentiment, web_search]
 TOOLS_BY_NAME = {t.name: t for t in TOOLS}
 
 RESEARCH_AGENT_SYSTEM_PROMPT = """You are a Senior Financial Equity Research Analyst Agent.
-Your objective is to conduct an end-to-end, data-driven research analysis on an equity ticker to answer:
+Your task is to autonomously research an equity ticker to answer:
 "Analyse the current financial health and market sentiment of [TICKER]. Identify the top three risks to its share price over the next 90 days and suggest one data-driven hedge strategy."
 
 You have access to 5 specialized tools:
@@ -37,16 +38,15 @@ You have access to 5 specialized tools:
 4. `llm_sentiment`: Performs qualitative LLM sentiment analysis on news headlines.
 5. `web_search`: Searches DuckDuckGo for analyst price targets, market commentary, or SEC filing notes.
 
-RESEARCH GUIDELINES:
-- Do NOT guess data. You MUST use your tools to gather empirical evidence.
-- You have total autonomy to decide which tools to call and in what order based on missing information.
-- For example, you might fetch price data first, calculate volatility, retrieve news, run headline sentiment analysis, and search for analyst reports.
-- Once you have gathered sufficient quantitative and qualitative evidence, present a comprehensive report structured with:
+DECISION & WORKFLOW RULES:
+- You have complete autonomy over tool selection and execution order.
+- Before calling tools, include a 1-sentence decision rationale in your response text explaining why you are choosing these specific tools based on current evidence (e.g., "Price data gathered; invoking calculate_volatility to measure risk variance.").
+- Do NOT output private chain-of-thought or raw internal reasoning. Keep decision rationales concise, professional, and state-focused.
+- Evaluate retrieved data at each step to determine if additional evidence is needed.
+- When sufficient quantitative and qualitative data is collected, synthesize a final research report containing:
   1. Financial Health & Price Trend Summary
-  2. Top Three Share Price Risks (with explicit empirical supporting evidence for each)
-  3. Data-Driven Hedge Strategy Recommendation (e.g. collar options, protective put, or inverse allocation)
-
-Be thorough, precise, and objective.
+  2. Top Three Share Price Risks (with explicit supporting evidence for each)
+  3. Data-Driven Hedge Strategy Recommendation.
 """
 
 
@@ -62,6 +62,35 @@ def _get_llm():
     )
 
 
+def _generate_concise_decision_summary(response: AIMessage, history: List[Any], ticker: str) -> str:
+    """
+    Generate a clean, 1-sentence decision summary without leaking private chain-of-thought.
+    """
+    if not response.tool_calls:
+        return "Sufficient evidence collected across technical and news metrics; synthesizing final report."
+
+    tool_names = [tc["name"] for tc in response.tool_calls]
+
+    # If the model provided brief response text, clean it up
+    content_str = str(response.content).strip() if response.content else ""
+    if content_str and len(content_str) < 200 and "\n" not in content_str:
+        return content_str
+
+    # Standard concise decision summaries based on tools selected
+    if "get_price_data" in tool_names and "calculate_volatility" in tool_names:
+        return f"Initial state evaluated; retrieving OHLCV price trends and historical volatility for {ticker}."
+    elif "get_price_data" in tool_names:
+        return f"Evaluating market foundation; retrieving technical price indicators and moving averages for {ticker}."
+    elif "calculate_volatility" in tool_names:
+        return f"Price history available; calculating annualized return volatility to quantify risk."
+    elif "get_news" in tool_names or "llm_sentiment" in tool_names:
+        return f"Quantitative price metrics gathered; retrieving recent financial news and analyzing qualitative sentiment for {ticker}."
+    elif "web_search" in tool_names:
+        return f"Searching external web intelligence for analyst price targets and market commentary on {ticker}."
+    else:
+        return f"Inspecting state; calling tool(s) {', '.join(tool_names)} to collect missing research data."
+
+
 def agent_node(state: AgentState) -> Dict[str, Any]:
     """
     LLM Agent Node.
@@ -71,36 +100,29 @@ def agent_node(state: AgentState) -> Dict[str, Any]:
     messages = list(state["messages"])
     ticker = state.get("ticker", "Equity")
 
-    # Ensure system prompt is present at head of message list
     if not messages or not isinstance(messages[0], SystemMessage):
         messages.insert(0, SystemMessage(content=RESEARCH_AGENT_SYSTEM_PROMPT))
 
     llm = _get_llm()
     llm_with_tools = llm.bind_tools(TOOLS)
 
-    # Log AGENT reasoning start
+    # Log AGENT evaluation
     log_trace_event(
         event_type="AGENT",
-        content=f"Evaluating research state for ticker '{ticker}'. Processing {len(messages)} history messages.",
+        content=f"Inspecting research state for {ticker} ({len(messages)} state messages).",
         metadata={"ticker": ticker, "message_count": len(messages)}
     )
 
     response: AIMessage = llm_with_tools.invoke(messages)
 
-    # Log AGENT DECISION based on output
-    if response.tool_calls:
-        tool_names = [tc["name"] for tc in response.tool_calls]
-        log_trace_event(
-            event_type="AGENT DECISION",
-            content=f"Decided to call {len(response.tool_calls)} tool(s): {', '.join(tool_names)}.",
-            metadata={"tool_calls": response.tool_calls}
-        )
-    else:
-        log_trace_event(
-            event_type="AGENT DECISION",
-            content="Gathered sufficient research data. Synthesizing final research report.",
-            metadata={"finish_reason": "synthesis"}
-        )
+    # Extract concise decision summary for notebook trace
+    decision_summary = _generate_concise_decision_summary(response, messages, ticker)
+
+    log_trace_event(
+        event_type="AGENT DECISION",
+        content=decision_summary,
+        metadata={"tool_calls_count": len(response.tool_calls) if response.tool_calls else 0}
+    )
 
     return {"messages": [response]}
 
@@ -122,10 +144,9 @@ def execute_tools_node(state: AgentState) -> Dict[str, Any]:
         tool_args = tool_call["args"]
         call_id = tool_call["id"]
 
-        # Log TOOL CALL event
         log_trace_event(
             event_type="TOOL CALL",
-            content=f"Invoking {tool_name} with parameters: {json.dumps(tool_args)}",
+            content=f"Invoking {tool_name} with arguments: {json.dumps(tool_args)}",
             metadata={"tool_name": tool_name, "args": tool_args, "call_id": call_id}
         )
 
@@ -144,7 +165,6 @@ def execute_tools_node(state: AgentState) -> Dict[str, Any]:
             result = {"status": "error", "error": f"Tool '{tool_name}' not found."}
             summary_str = json.dumps(result)
 
-        # Log TOOL RESULT event
         log_trace_event(
             event_type="TOOL RESULT",
             content=summary_str,

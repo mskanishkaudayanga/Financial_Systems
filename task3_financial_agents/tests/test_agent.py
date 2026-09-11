@@ -1,11 +1,12 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Create pytest unit tests for Task 3A single agent StateGraph structure, nodes, and conditional edges', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Update test_agent.py verifying dynamic state-based decision routing and decision summary formatting', Date: 2026-09-11
 """
 Unit test suite for Task 3A Autonomous Financial Research Agent Graph.
 """
 
 import pytest
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from src.workflows import create_single_agent_graph, should_continue
+from src.agents.research_agent import _generate_concise_decision_summary
 from src.schemas.agent_schemas import AgentState
 from langgraph.graph import END
 
@@ -22,7 +23,7 @@ def test_graph_compilation_and_nodes():
 def test_should_continue_with_tool_calls():
     """Verify conditional edge routes to 'tools' when AIMessage contains tool_calls."""
     ai_msg_with_tools = AIMessage(
-        content="I will check market data.",
+        content="Technical trend information is insufficient; I will retrieve price data.",
         tool_calls=[{"name": "get_price_data", "args": {"ticker": "AAPL"}, "id": "call_1"}]
     )
     state: AgentState = {
@@ -46,3 +47,15 @@ def test_should_continue_synthesis_finish():
     }
     decision = should_continue(state)
     assert decision == END
+
+
+def test_concise_decision_summary_generation():
+    """Verify concise 1-sentence decision summary extraction without private chain-of-thought."""
+    response_with_tools = AIMessage(
+        content="",
+        tool_calls=[{"name": "calculate_volatility", "args": {"ticker": "MSFT"}, "id": "call_2"}]
+    )
+    summary = _generate_concise_decision_summary(response_with_tools, [], "MSFT")
+    assert "volatility" in summary.lower()
+    assert len(summary) < 200
+    assert "\n" not in summary
