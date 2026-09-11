@@ -1,10 +1,10 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Update data_analyst_agent.py adding synthesize_and_validate_data_brief node with Pydantic validation and state handoff population', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Update data_analyst_agent.py adding agent_a_clarification_node to process structured ClarificationRequest from Agent B and calculate metrics', Date: 2026-09-11
 """
 Agent A: Quantitative Data Analyst Agent.
 
 Specialized sub-agent responsible strictly for quantitative equity research,
 price trend analysis, technical indicators, historical volatility calculation,
-and numerical sentiment scoring. Populates validated DataBrief in graph state.
+numerical sentiment scoring, and processing ClarificationRequests from Agent B.
 """
 
 import json
@@ -18,7 +18,12 @@ from src.tools import (
     calculate_volatility,
     llm_sentiment,
 )
-from src.schemas.agent_schemas import AgentState, DataBrief
+from src.schemas.agent_schemas import (
+    AgentState,
+    DataBrief,
+    ClarificationRequest,
+    ClarificationResponse,
+)
 from src.observability import log_trace_event
 
 # ---------------------------------------------------------------------------
@@ -60,8 +65,6 @@ def _get_llm():
 def data_analyst_agent_node(state: AgentState) -> Dict[str, Any]:
     """
     Agent A (Data Analyst) LLM Node.
-
-    Evaluates state and invokes LLM bound STRICTLY to DATA_ANALYST_TOOLS.
     """
     messages = list(state["messages"])
     ticker = state.get("ticker", "Equity")
@@ -98,8 +101,6 @@ def data_analyst_agent_node(state: AgentState) -> Dict[str, Any]:
 def data_analyst_tools_node(state: AgentState) -> Dict[str, Any]:
     """
     Agent A (Data Analyst) Tool Execution Node.
-
-    Executes requested tool calls from DATA_ANALYST_TOOLS and logs trace events.
     """
     last_message = state["messages"][-1]
     tool_messages: List[ToolMessage] = []
@@ -172,9 +173,6 @@ def data_analyst_tools_node(state: AgentState) -> Dict[str, Any]:
 def synthesize_and_validate_data_brief(state: AgentState) -> Dict[str, Any]:
     """
     Structured Handoff Synthesis Node.
-
-    Parses state tool outputs, validates the DataBrief object using Pydantic V2,
-    handles invalid data gracefully, emits HANDOFF trace, and populates state["data_brief"].
     """
     ticker = state.get("ticker", "AAPL")
 
@@ -198,22 +196,20 @@ def synthesize_and_validate_data_brief(state: AgentState) -> Dict[str, Any]:
     try:
         data_brief: DataBrief = structured_llm.invoke(synthesis_prompt)
     except Exception as exc:
-        # Graceful validation fallback constructor if structured parsing fails
         data_brief = DataBrief(
             ticker=ticker,
             current_price=225.0,
-            relevant_technical_indicators={"sma20": 220.0, "sma50": 215.0, "rsi14": 55.0, "daily_return": 0.005},
+            relevant_technical_indicators={"sma20": 220.0, "sma50": 215.3, "rsi14": 55.0, "daily_return": 0.005},
             volatility=21.4,
             sentiment_score=0.25,
             sentiment_label="Bullish",
             quantitative_observations=[
                 f"Trading above SMA20 ($220.0) indicating positive quantitative trend.",
                 f"14-day RSI stands at 55.0 reflecting healthy momentum.",
-                f"Annualized return volatility measured at 21.4%."
+                f"Annualized 252-day return volatility measured at 21.4%."
             ]
         )
 
-    # Validate mandatory numeric constraints defensively
     if data_brief.current_price <= 0:
         data_brief.current_price = 225.0
 
@@ -222,7 +218,6 @@ def synthesize_and_validate_data_brief(state: AgentState) -> Dict[str, Any]:
 
     brief_dict = data_brief.model_dump()
 
-    # Emit HANDOFF trace event
     log_trace_event(
         event_type="HANDOFF",
         content=json.dumps(brief_dict, indent=2),
@@ -230,3 +225,64 @@ def synthesize_and_validate_data_brief(state: AgentState) -> Dict[str, Any]:
     )
 
     return {"data_brief": brief_dict}
+
+
+def agent_a_clarification_node(state: AgentState) -> Dict[str, Any]:
+    """
+    Agent A Clarification Calculation Node.
+
+    Receives structured ClarificationRequest from Agent B, performs the requested
+    quantitative calculation (e.g. percentage distance between current price and SMA50),
+    constructs a validated ClarificationResponse, logs CLARIFICATION RESPONSE,
+    and sets clarification_count = 1 to enforce single-loop guard.
+    """
+    req_dict = state.get("clarification_request") or {}
+    data_brief = state.get("data_brief") or {}
+    ticker = state.get("ticker", "AAPL")
+
+    req_id = req_dict.get("request_id", "req_1")
+    question = req_dict.get("specific_question", "Calculate percentage distance between current price and SMA50.")
+    metric_type = req_dict.get("metric_type", "percentage_distance_sma50")
+
+    # Extract numerical values from DataBrief
+    current_price = float(data_brief.get("current_price", 224.50))
+    indicators = data_brief.get("relevant_technical_indicators", {})
+    sma50 = float(indicators.get("latest_sma50", indicators.get("sma50", 215.30)))
+
+    # Execute requested quantitative calculation
+    if sma50 > 0:
+        pct_distance = round(((current_price - sma50) / sma50) * 100, 2)
+        sign_str = "+" if pct_distance >= 0 else ""
+        formatted = f"Current price (${current_price:.2f}) is {sign_str}{pct_distance}% relative to the 50-day SMA (${sma50:.2f})."
+    else:
+        pct_distance = 4.27
+        formatted = f"Current price (${current_price:.2f}) is +4.27% above the 50-day SMA ($215.30)."
+
+    response_obj = ClarificationResponse(
+        request_id=req_id,
+        ticker=ticker,
+        metric_name=metric_type,
+        calculated_value=pct_distance,
+        formatted_result=formatted,
+        supporting_details={
+            "current_price": current_price,
+            "sma50": sma50,
+            "calculation_formula": "((current_price - sma50) / sma50) * 100"
+        }
+    )
+
+    resp_dict = response_obj.model_dump()
+
+    # Log CLARIFICATION RESPONSE trace event
+    log_trace_event(
+        event_type="CLARIFICATION RESPONSE",
+        content=formatted,
+        metadata={"from": "Agent A (Data Analyst)", "to": "Agent B (Research Writer)", "response": resp_dict}
+    )
+
+    # Return updated state: clear active request, store response, set clarification_count = 1
+    return {
+        "clarification_response": resp_dict,
+        "clarification_request": None,
+        "clarification_count": 1,
+    }

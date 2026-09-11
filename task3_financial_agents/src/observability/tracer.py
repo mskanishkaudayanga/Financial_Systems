@@ -1,8 +1,8 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Update tracer.py adding HANDOFF event formatting for structured agent data transfer logging', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Update tracer.py adding CLARIFICATION REQUEST and CLARIFICATION RESPONSE trace event formatting for inter-agent critique logging', Date: 2026-09-11
 """
 Observability and Trace Logging Infrastructure.
 
-Emits structured execution logs (AGENT, TOOL CALL, TOOL RESULT, UPDATED OBSERVATION, AGENT DECISION, HANDOFF)
+Emits structured execution logs (AGENT, TOOL CALL, TOOL RESULT, UPDATED OBSERVATION, AGENT DECISION, HANDOFF, CLARIFICATION REQUEST, CLARIFICATION RESPONSE)
 to standard output (notebook/terminal) and persistent agent_trace.jsonl file.
 """
 
@@ -27,6 +27,8 @@ def log_trace_event(
     - UPDATED OBSERVATION: State observation summary recorded from tool output
     - AGENT DECISION: Strategic choice, replan, or state transition decision
     - HANDOFF: Structured Pydantic payload handoff between sub-agents
+    - CLARIFICATION REQUEST: Structured ClarificationRequest from Agent B to Agent A
+    - CLARIFICATION RESPONSE: Structured ClarificationResponse from Agent A to Agent B
     """
     timestamp = datetime.now(timezone.utc).isoformat()
     meta = metadata or {}
@@ -65,7 +67,17 @@ def log_trace_event(
         to_agent = meta.get("to", "Agent B")
         print(f"\n🤝 {header_box}")
         print(f"   Handoff: {from_agent} -> {to_agent}")
-        print(f"   Payload: {content[:300]}..." if len(content) > 300 else f"   Payload: {content}")
+        print(f"   Payload: {content[:250]}..." if len(content) > 250 else f"   Payload: {content}")
+
+    elif event_type == "CLARIFICATION REQUEST":
+        print(f"\n❓ {header_box}")
+        print(f"   From: Agent B (Research Writer) -> To: Agent A (Data Analyst)")
+        print(f"   Question: {content}")
+
+    elif event_type == "CLARIFICATION RESPONSE":
+        print(f"\n💡 {header_box}")
+        print(f"   From: Agent A (Data Analyst) -> To: Agent B (Research Writer)")
+        print(f"   Calculated Metric: {content}")
 
     else:
         print(f"\nℹ️  {header_box} {content}")

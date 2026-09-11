@@ -24,12 +24,18 @@ This document records AI assistance and external technical references used in de
 ### 6. Task 3B Agent B: Qualitative Research Writer & Multi-Agent Graph (Phase 5)
 # AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Implement Agent B Qualitative Research Writer with tool restriction [get_news, web_search], multi-agent sequential StateGraph, DataBrief handoff integration, and final report synthesis', Date: 2026-09-11
 
+### 7. Task 3B Critique & Clarification Loop (Phase 6)
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Implement inter-agent critique clarification loop with ClarificationRequest and ClarificationResponse Pydantic models, agent_a_clarification_node, single-loop recursion guard, and trace logging', Date: 2026-09-11
+
+### 8. Task 3C Short-Term & Persistent Memory System (Phase 7)
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Implement Task 3C Memory with short-term MemorySaver checkpointer for thread sessions and persistent JSON cache cache/{TICKER}_{YYYY-MM-DD}.json with corrupt payload validation', Date: 2026-09-11
+
 ---
 
 ## 📚 Technical Documentation & Literature References
 
 1. **LangGraph State Graph Framework**:
-   - Official documentation for cyclic graphs, agent state channels, conditional routing, and checkpointers.
+   - Official documentation for cyclic graphs, agent state channels, conditional routing, and checkpointers (`MemorySaver`).
    - Reference: https://python.langchain.com/docs/langgraph/
 
 2. **LangChain Core & Tool Interfaces**:

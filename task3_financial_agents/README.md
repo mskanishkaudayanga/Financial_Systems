@@ -79,3 +79,21 @@ Standard Python modules handle system-level logic:
 - **`src/observability/`**: Custom JSONL trace logging, file IO, and timing logic.
 - **`cache/`**: Filesystem disk caching using Python built-in `pathlib` and `json`/`pickle`.
 - **Numerical Computations**: Pandas and NumPy deterministic data transformations in `src/tools/`.
+
+---
+
+## 📊 Streamlit Observability Dashboard (Bonus Feature)
+
+A read-only visual observability dashboard is provided in `dashboard.py` to inspect `agent_trace.jsonl`.
+
+### Launching the Dashboard
+
+```bash
+streamlit run dashboard.py
+```
+
+### Dashboard Features
+- **Summary Metrics**: Displays total events, total tool calls, tool results, agent decisions, and execution duration.
+- **Tool Usage Breakdown**: Bar chart and table showing tool calls by tool name.
+- **Chronological Execution Trace**: Searchable and filterable chronological trace table.
+- **Input & Output Previews**: Expanders displaying exact input arguments, execution metadata, and output content previews without altering the audit log.

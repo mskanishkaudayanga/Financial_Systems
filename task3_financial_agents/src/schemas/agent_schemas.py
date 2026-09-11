@@ -1,9 +1,10 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Update AgentState in src/schemas/agent_schemas.py adding dedicated data_brief field for structured handoff', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Update src/schemas/agent_schemas.py adding ClarificationRequest and ClarificationResponse Pydantic schemas and clarification state fields to AgentState', Date: 2026-09-11
 """
 Agent State and Research Report Schemas.
 
-Defines the explicit LangGraph state container (AgentState) and Pydantic schemas
-for structured final report generation (FinancialReportSchema) and Agent A (DataBrief).
+Defines the explicit LangGraph state container (AgentState), Pydantic schemas
+for structured report generation (FinancialReportSchema), Agent A DataBrief,
+and structured Clarification Request/Response models for inter-agent critique loops.
 """
 
 from typing import List, Optional, Sequence, TypedDict, Annotated, Dict, Any
@@ -30,6 +31,34 @@ class ObservationRecord(BaseModel):
     has_error: bool = Field(default=False, description="True if tool failed or returned 0 items")
 
 
+# ---------------------------------------------------------------------------
+# Clarification / Critique Loop Schemas
+# ---------------------------------------------------------------------------
+
+class ClarificationRequest(BaseModel):
+    """Structured Clarification Request issued by Agent B (Research Writer) to Agent A."""
+
+    ticker: str = Field(description="Equity ticker symbol under investigation (e.g. 'AAPL')")
+    request_id: str = Field(default="req_1", description="Unique request identifier")
+    specific_question: str = Field(
+        description="Specific quantitative calculation or metric requested (e.g. 'Calculate the percentage distance between current price and SMA50')"
+    )
+    metric_type: str = Field(
+        description="Category of metric requested (e.g. 'percentage_distance_sma50', 'sma20_sma50_spread', 'volatility_ratio')"
+    )
+
+
+class ClarificationResponse(BaseModel):
+    """Structured Clarification Response returned by Agent A (Data Analyst) to Agent B."""
+
+    request_id: str = Field(description="Matching request identifier")
+    ticker: str = Field(description="Equity ticker symbol")
+    metric_name: str = Field(description="Name of calculated metric")
+    calculated_value: float = Field(description="Numerical result of calculation")
+    formatted_result: str = Field(description="Human-readable result summary (e.g. 'Current price $224.50 is +4.27% above SMA50 ($215.30)')")
+    supporting_details: Dict[str, Any] = Field(description="Raw supporting values used in calculation")
+
+
 class AgentState(TypedDict):
     """
     Explicit Graph State for Financial Research Agents.
@@ -39,7 +68,10 @@ class AgentState(TypedDict):
         ticker: Equity ticker symbol under research (e.g. 'AAPL').
         research_question: Full user research prompt.
         observations: Accumulated sequence of structured tool observation summaries.
-        data_brief: Dedicated structured handoff payload produced by Agent A (Data Analyst) for Agent B.
+        data_brief: Dedicated structured handoff payload produced by Agent A for Agent B.
+        clarification_request: Structured ClarificationRequest issued by Agent B to Agent A.
+        clarification_response: Structured ClarificationResponse returned by Agent A to Agent B.
+        clarification_count: Counter guard enforcing max 1 clarification loop between agents.
         final_report: Markdown or structured report string produced by synthesis.
     """
 
@@ -48,6 +80,9 @@ class AgentState(TypedDict):
     research_question: str
     observations: Annotated[List[Dict[str, Any]], add_observations]
     data_brief: Optional[Dict[str, Any]]
+    clarification_request: Optional[Dict[str, Any]]
+    clarification_response: Optional[Dict[str, Any]]
+    clarification_count: int
     final_report: Optional[str]
 
 
