@@ -1,13 +1,13 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Create src/observability/tracer.py formatting AGENT, TOOL CALL, TOOL RESULT, AGENT DECISION steps to stdout and agent_trace.jsonl', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Update tracer.py adding UPDATED OBSERVATION event formatting with datetime.now(timezone.utc)', Date: 2026-09-11
 """
 Observability and Trace Logging Infrastructure.
 
-Emits structured execution logs (AGENT, TOOL CALL, TOOL RESULT, AGENT DECISION)
-to both standard output (notebook/terminal) and persistent agent_trace.jsonl file.
+Emits structured execution logs (AGENT, TOOL CALL, TOOL RESULT, UPDATED OBSERVATION, AGENT DECISION)
+to standard output (notebook/terminal) and persistent agent_trace.jsonl file.
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from src.config import config
 
@@ -23,22 +23,17 @@ def log_trace_event(
     Supported event types:
     - AGENT: Reasoning / system evaluation by the agent
     - TOOL CALL: Tool invocation details (tool name, arguments)
-    - TOOL RESULT: Output returned by executed tool
-    - AGENT DECISION: Strategic choice or state transition decision
-
-    Args:
-        event_type: One of 'AGENT', 'TOOL CALL', 'TOOL RESULT', 'AGENT DECISION'.
-        content: Main text summary or log body.
-        metadata: Additional structured key-value metadata.
+    - TOOL RESULT: Raw output returned by executed tool
+    - UPDATED OBSERVATION: State observation summary recorded from tool output
+    - AGENT DECISION: Strategic choice, replan, or state transition decision
     """
-    timestamp = datetime.utcnow().isoformat() + "Z"
+    timestamp = datetime.now(timezone.utc).isoformat()
     meta = metadata or {}
 
-    # 1. Console / Notebook trace formatting
     header_box = f"[{event_type}] ({timestamp[:19]})"
 
     if event_type == "AGENT":
-        print(f"\n🤖 \031{header_box}\031")
+        print(f"\n🤖 {header_box}")
         print(f"   Reasoning: {content}")
 
     elif event_type == "TOOL CALL":
@@ -53,7 +48,12 @@ def log_trace_event(
         status = meta.get("status", "success")
         print(f"\n📊 {header_box}")
         print(f"   Tool: {tool_name} | Status: {status}")
-        print(f"   Result Summary: {content[:300]}..." if len(content) > 300 else f"   Result Summary: {content}")
+        print(f"   Result Summary: {content[:250]}..." if len(content) > 250 else f"   Result Summary: {content}")
+
+    elif event_type == "UPDATED OBSERVATION":
+        tool_name = meta.get("tool_name", "UnknownTool")
+        print(f"\n👁️  {header_box}")
+        print(f"   Observation ({tool_name}): {content}")
 
     elif event_type == "AGENT DECISION":
         print(f"\n💡 {header_box}")
@@ -62,7 +62,7 @@ def log_trace_event(
     else:
         print(f"\nℹ️  {header_box} {content}")
 
-    # 2. Append event to agent_trace.jsonl
+    # Append event to agent_trace.jsonl
     try:
         config.TRACE_FILE.parent.mkdir(parents=True, exist_ok=True)
         log_entry = {
@@ -74,4 +74,4 @@ def log_trace_event(
         with open(config.TRACE_FILE, "a", encoding="utf-8") as f:
             f.write(json.dumps(log_entry) + "\n")
     except Exception:
-        pass  # Defensive non-blocking logging
+        pass
