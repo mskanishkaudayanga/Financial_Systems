@@ -1,7 +1,9 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Create task3_financial_agents requirements.txt with minimal dependencies for LangChain and LangGraph financial research agent', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Update task3_financial_agents requirements.txt with duckduckgo-search and langchain-openai', Date: 2026-09-11
 langchain-core>=0.2.0
 langchain-community>=0.2.0
+langchain-openai>=0.1.0
 langgraph>=0.1.0
+duckduckgo-search>=6.0.0
 python-dotenv>=1.0.0
 pydantic>=2.0.0
 pandas>=2.0.0

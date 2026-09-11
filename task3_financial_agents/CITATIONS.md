@@ -9,6 +9,9 @@ This document records AI assistance and external technical references used in de
 ### 1. Project Architecture & Configuration Setup (Foundation Phase)
 # AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Create task3_financial_agents project directory structure, config management using python-dotenv, requirements.txt, and .gitignore rules', Date: 2026-09-11
 
+### 2. Independent Research Tools Implementation (Phase 1)
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Implement 5 independent financial research tools (get_price_data, get_news, calculate_volatility, llm_sentiment, web_search) with Pydantic schemas, defensive failure handling, type hints, and pytest coverage', Date: 2026-09-11
+
 ---
 
 ## 📚 Technical Documentation & Literature References
@@ -24,3 +27,10 @@ This document records AI assistance and external technical references used in de
 3. **Python-Dotenv Configuration Management**:
    - Environment variable isolation and local `.env` loading.
    - Reference: https://saurabh-kumar.com/python-dotenv/
+
+4. **DuckDuckGo Search Python Library**:
+   - DDGS text search API for retrieving search results and analyst commentary without API keys.
+   - Reference: https://github.com/deedy5/duckduckgo_search
+
+5. **Annualized Historical Volatility**:
+   - Financial market convention for calculating annualized volatility from daily log/pct returns using $\sigma_{\text{daily}} \times \sqrt{252}$.

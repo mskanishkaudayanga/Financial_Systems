@@ -1,0 +1,125 @@
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Implement get_news tool using yfinance news with structured normalization and defensive error handling', Date: 2026-09-11
+"""
+Financial News Tool.
+
+Retrieves recent market and equity news for a ticker symbol using yfinance,
+normalizes news payloads across API version schemas, and returns structured data.
+"""
+
+from typing import Dict, Any, List
+from datetime import datetime
+import yfinance as yf
+
+from src.schemas.tools_schemas import NewsOutput, NewsItem
+
+
+def get_news(ticker: str, n: int = 10) -> Dict[str, Any]:
+    """
+    Retrieve recent financial news items for a specified equity ticker.
+
+    Args:
+        ticker: Equity ticker symbol (e.g., 'AAPL', 'MSFT', 'GOOGL').
+        n: Maximum number of news articles to return (default 10).
+
+    Returns:
+        Dict[str, Any]: Serialized dictionary conforming to NewsOutput schema.
+    """
+    # 1. Validate inputs
+    if not ticker or not isinstance(ticker, str) or not ticker.strip():
+        return NewsOutput(
+            status="error",
+            ticker=str(ticker),
+            count=0,
+            error="Ticker symbol must be a non-empty string."
+        ).model_dump()
+
+    cleaned_ticker = ticker.strip().upper()
+
+    if not isinstance(n, int) or n <= 0:
+        return NewsOutput(
+            status="error",
+            ticker=cleaned_ticker,
+            count=0,
+            error="Article count limit 'n' must be a positive integer."
+        ).model_dump()
+
+    # 2. Retrieve news via yfinance
+    try:
+        ticker_obj = yf.Ticker(cleaned_ticker)
+        raw_news = ticker_obj.news
+    except Exception as exc:
+        return NewsOutput(
+            status="error",
+            ticker=cleaned_ticker,
+            count=0,
+            error=f"Failed to fetch news from yfinance: {str(exc)}"
+        ).model_dump()
+
+    if not raw_news or not isinstance(raw_news, list):
+        return NewsOutput(
+            status="success",
+            ticker=cleaned_ticker,
+            count=0,
+            news=[]
+        ).model_dump()
+
+    # 3. Normalize news items
+    news_items: List[NewsItem] = []
+    for item in raw_news[:n]:
+        if not isinstance(item, dict):
+            continue
+
+        # Support both legacy flat yfinance schema and modern nested 'content' schema
+        content = item.get("content", {}) if isinstance(item.get("content"), dict) else {}
+
+        title = (
+            item.get("title")
+            or content.get("title")
+            or "No Title Available"
+        )
+
+        publisher = (
+            item.get("publisher")
+            or content.get("provider", {}).get("displayName")
+            or "Financial Market News"
+        )
+
+        # Published date parsing
+        pub_time = item.get("providerPublishTime") or content.get("pubDate")
+        if isinstance(pub_time, (int, float)):
+            published_date = datetime.fromtimestamp(pub_time).strftime("%Y-%m-%d %H:%M:%S")
+        elif isinstance(pub_time, str):
+            published_date = pub_time
+        else:
+            published_date = datetime.utcnow().strftime("%Y-%m-%d")
+
+        url = (
+            item.get("link")
+            or content.get("canonicalUrl", {}).get("url")
+            or content.get("clickThroughUrl", {}).get("url")
+            or f"https://finance.yahoo.com/quote/{cleaned_ticker}"
+        )
+
+        summary = (
+            item.get("summary")
+            or content.get("summary")
+            or content.get("description")
+            or title
+        )
+
+        news_items.append(
+            NewsItem(
+                title=str(title).strip(),
+                publisher=str(publisher).strip(),
+                published_date=str(published_date).strip(),
+                url=str(url).strip(),
+                summary=str(summary).strip()
+            )
+        )
+
+    return NewsOutput(
+        status="success",
+        ticker=cleaned_ticker,
+        count=len(news_items),
+        news=news_items
+    ).model_dump()
