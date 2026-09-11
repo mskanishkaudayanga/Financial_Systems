@@ -18,6 +18,12 @@ This document records AI assistance and external technical references used in de
 ### 4. Task 3A Single Autonomous Agent & StateGraph Workflow (Phase 3)
 # AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Implement Task 3A autonomous agent using LangGraph StateGraph, custom tool execution node with trace logging (AGENT, TOOL CALL, TOOL RESULT, AGENT DECISION), and structured report generation', Date: 2026-09-11
 
+### 5. Task 3B Agent A: Quantitative Data Analyst (Phase 4)
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Implement Agent A Quantitative Data Analyst with strict tool access control [get_price_data, calculate_volatility, llm_sentiment], StateGraph compilation, and DataBrief Pydantic schema synthesis', Date: 2026-09-11
+
+### 6. Task 3B Agent B: Qualitative Research Writer & Multi-Agent Graph (Phase 5)
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Implement Agent B Qualitative Research Writer with tool restriction [get_news, web_search], multi-agent sequential StateGraph, DataBrief handoff integration, and final report synthesis', Date: 2026-09-11
+
 ---
 
 ## 📚 Technical Documentation & Literature References

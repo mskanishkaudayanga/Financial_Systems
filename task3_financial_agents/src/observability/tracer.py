@@ -1,8 +1,8 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Update tracer.py adding UPDATED OBSERVATION event formatting with datetime.now(timezone.utc)', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Update tracer.py adding HANDOFF event formatting for structured agent data transfer logging', Date: 2026-09-11
 """
 Observability and Trace Logging Infrastructure.
 
-Emits structured execution logs (AGENT, TOOL CALL, TOOL RESULT, UPDATED OBSERVATION, AGENT DECISION)
+Emits structured execution logs (AGENT, TOOL CALL, TOOL RESULT, UPDATED OBSERVATION, AGENT DECISION, HANDOFF)
 to standard output (notebook/terminal) and persistent agent_trace.jsonl file.
 """
 
@@ -26,6 +26,7 @@ def log_trace_event(
     - TOOL RESULT: Raw output returned by executed tool
     - UPDATED OBSERVATION: State observation summary recorded from tool output
     - AGENT DECISION: Strategic choice, replan, or state transition decision
+    - HANDOFF: Structured Pydantic payload handoff between sub-agents
     """
     timestamp = datetime.now(timezone.utc).isoformat()
     meta = metadata or {}
@@ -58,6 +59,13 @@ def log_trace_event(
     elif event_type == "AGENT DECISION":
         print(f"\n💡 {header_box}")
         print(f"   Decision: {content}")
+
+    elif event_type == "HANDOFF":
+        from_agent = meta.get("from", "Agent A")
+        to_agent = meta.get("to", "Agent B")
+        print(f"\n🤝 {header_box}")
+        print(f"   Handoff: {from_agent} -> {to_agent}")
+        print(f"   Payload: {content[:300]}..." if len(content) > 300 else f"   Payload: {content}")
 
     else:
         print(f"\nℹ️  {header_box} {content}")

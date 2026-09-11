@@ -1,9 +1,9 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Update src/schemas/agent_schemas.py with ObservationRecord model and observations channel in AgentState for Observe-Replan-Act cycle', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Update AgentState in src/schemas/agent_schemas.py adding dedicated data_brief field for structured handoff', Date: 2026-09-11
 """
 Agent State and Research Report Schemas.
 
 Defines the explicit LangGraph state container (AgentState) and Pydantic schemas
-for structured final report generation (FinancialReportSchema).
+for structured final report generation (FinancialReportSchema) and Agent A (DataBrief).
 """
 
 from typing import List, Optional, Sequence, TypedDict, Annotated, Dict, Any
@@ -32,13 +32,14 @@ class ObservationRecord(BaseModel):
 
 class AgentState(TypedDict):
     """
-    Explicit Graph State for the Autonomous Financial Research Agent.
+    Explicit Graph State for Financial Research Agents.
 
     Attributes:
         messages: Accumulated sequence of conversation and tool execution messages.
         ticker: Equity ticker symbol under research (e.g. 'AAPL').
         research_question: Full user research prompt.
         observations: Accumulated sequence of structured tool observation summaries.
+        data_brief: Dedicated structured handoff payload produced by Agent A (Data Analyst) for Agent B.
         final_report: Markdown or structured report string produced by synthesis.
     """
 
@@ -46,11 +47,40 @@ class AgentState(TypedDict):
     ticker: str
     research_question: str
     observations: Annotated[List[Dict[str, Any]], add_observations]
+    data_brief: Optional[Dict[str, Any]]
     final_report: Optional[str]
 
 
 # ---------------------------------------------------------------------------
-# Structured Report Schemas
+# Task 3B Agent A: Structured Data Brief Schema
+# ---------------------------------------------------------------------------
+
+class DataBrief(BaseModel):
+    """
+    Structured Quantitative Data Brief produced by Agent A (Data Analyst).
+    """
+
+    ticker: str = Field(description="Equity ticker symbol analyzed (e.g. 'AAPL')")
+    current_price: float = Field(description="Most recent closing price in USD")
+    relevant_technical_indicators: Dict[str, Any] = Field(
+        description="Key technical indicators dictionary containing latest_sma20, latest_sma50, latest_ema20, latest_rsi14, latest_daily_return"
+    )
+    volatility: Optional[float] = Field(
+        default=None, description="Annualized historical volatility percentage (e.g. 21.4 for 21.4%)"
+    )
+    sentiment_score: Optional[float] = Field(
+        default=None, description="Quantitative headline sentiment score ranging from -1.0 (bearish) to +1.0 (bullish)"
+    )
+    sentiment_label: Optional[str] = Field(
+        default=None, description="Qualitative sentiment classification label ('Bullish', 'Bearish', 'Neutral')"
+    )
+    quantitative_observations: List[str] = Field(
+        description="Bullet points of key quantitative insights and numerical findings derived from market tools"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Task 3A / 3B Structured Report Schemas
 # ---------------------------------------------------------------------------
 
 class RiskItem(BaseModel):
