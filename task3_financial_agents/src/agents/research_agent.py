@@ -1,14 +1,13 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Refine research_agent.py to emit concise 1-sentence decision summaries without private chain-of-thought for autonomous tool selection', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Optimize research_agent.py for parallel tool dispatch and strict non-retry budget rules to complete research in 2-3 turns', Date: 2026-09-11
 """
 Autonomous Financial Research Agent Nodes.
 
-Implements the single agent node and custom tool node for autonomous financial research
-with integrated trace logging (AGENT, TOOL CALL, TOOL RESULT, AGENT DECISION)
-and concise 1-sentence decision summaries.
+Implements optimized single agent node and custom tool execution node with parallel
+tool dispatch, strict non-retry budget rules, and trace logging.
 """
 
 import json
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
 
@@ -28,7 +27,7 @@ TOOLS = [get_price_data, get_news, calculate_volatility, llm_sentiment, web_sear
 TOOLS_BY_NAME = {t.name: t for t in TOOLS}
 
 RESEARCH_AGENT_SYSTEM_PROMPT = """You are a Senior Financial Equity Research Analyst Agent.
-Your task is to autonomously research an equity ticker to answer:
+Your task is to efficiently research an equity ticker to answer:
 "Analyse the current financial health and market sentiment of [TICKER]. Identify the top three risks to its share price over the next 90 days and suggest one data-driven hedge strategy."
 
 You have access to 5 specialized tools:
@@ -36,14 +35,14 @@ You have access to 5 specialized tools:
 2. `get_news`: Retrieves recent financial news articles and headlines.
 3. `calculate_volatility`: Computes 60 to 252-day annualized historical volatility.
 4. `llm_sentiment`: Performs qualitative LLM sentiment analysis on news headlines.
-5. `web_search`: Searches DuckDuckGo for analyst price targets, market commentary, or SEC filing notes.
+5. `web_search`: Searches DuckDuckGo for analyst price targets or market commentary.
 
-DECISION & WORKFLOW RULES:
-- You have complete autonomy over tool selection and execution order.
-- Before calling tools, include a 1-sentence decision rationale in your response text explaining why you are choosing these specific tools based on current evidence (e.g., "Price data gathered; invoking calculate_volatility to measure risk variance.").
-- Do NOT output private chain-of-thought or raw internal reasoning. Keep decision rationales concise, professional, and state-focused.
-- Evaluate retrieved data at each step to determine if additional evidence is needed.
-- When sufficient quantitative and qualitative data is collected, synthesize a final research report containing:
+INDUSTRY EFFICIENCY & TOOL EXECUTION RULES:
+- **PARALLEL DISPATCH**: In your VERY FIRST TURN, issue parallel tool calls for `get_price_data`, `calculate_volatility`, and `get_news` simultaneously.
+- **NO RETRIES**: If `web_search` or `get_news` returns 0 results, DO NOT retry with alternative search queries. Accept the output and proceed immediately.
+- **STRICT TURN BUDGET**: Complete all data collection in 1-2 tool turns, then immediately synthesize the final research report.
+- Before calling tools, include a 1-sentence decision rationale explaining your parallel tool choices. Do NOT output private chain-of-thought.
+- Synthesize a comprehensive final research report containing:
   1. Financial Health & Price Trend Summary
   2. Top Three Share Price Risks (with explicit supporting evidence for each)
   3. Data-Driven Hedge Strategy Recommendation.
@@ -63,32 +62,28 @@ def _get_llm():
 
 
 def _generate_concise_decision_summary(response: AIMessage, history: List[Any], ticker: str) -> str:
-    """
-    Generate a clean, 1-sentence decision summary without leaking private chain-of-thought.
-    """
+    """Generate a clean, 1-sentence decision summary without leaking private chain-of-thought."""
     if not response.tool_calls:
-        return "Sufficient evidence collected across technical and news metrics; synthesizing final report."
+        return "Sufficient quantitative and qualitative data collected; synthesizing final report."
 
     tool_names = [tc["name"] for tc in response.tool_calls]
 
-    # If the model provided brief response text, clean it up
     content_str = str(response.content).strip() if response.content else ""
     if content_str and len(content_str) < 200 and "\n" not in content_str:
         return content_str
 
-    # Standard concise decision summaries based on tools selected
-    if "get_price_data" in tool_names and "calculate_volatility" in tool_names:
-        return f"Initial state evaluated; retrieving OHLCV price trends and historical volatility for {ticker}."
+    if len(tool_names) > 1:
+        return f"Executing parallel research dispatch for {ticker}: calling {', '.join(tool_names)} simultaneously."
     elif "get_price_data" in tool_names:
-        return f"Evaluating market foundation; retrieving technical price indicators and moving averages for {ticker}."
+        return f"Evaluating market foundation; retrieving technical price indicators for {ticker}."
     elif "calculate_volatility" in tool_names:
         return f"Price history available; calculating annualized return volatility to quantify risk."
     elif "get_news" in tool_names or "llm_sentiment" in tool_names:
-        return f"Quantitative price metrics gathered; retrieving recent financial news and analyzing qualitative sentiment for {ticker}."
+        return f"Retrieving recent news and analyzing qualitative headline sentiment for {ticker}."
     elif "web_search" in tool_names:
-        return f"Searching external web intelligence for analyst price targets and market commentary on {ticker}."
+        return f"Executing single web search query for analyst commentary on {ticker}."
     else:
-        return f"Inspecting state; calling tool(s) {', '.join(tool_names)} to collect missing research data."
+        return f"Calling tool(s) {', '.join(tool_names)} to collect remaining data."
 
 
 def agent_node(state: AgentState) -> Dict[str, Any]:
@@ -106,7 +101,6 @@ def agent_node(state: AgentState) -> Dict[str, Any]:
     llm = _get_llm()
     llm_with_tools = llm.bind_tools(TOOLS)
 
-    # Log AGENT evaluation
     log_trace_event(
         event_type="AGENT",
         content=f"Inspecting research state for {ticker} ({len(messages)} state messages).",
@@ -115,7 +109,6 @@ def agent_node(state: AgentState) -> Dict[str, Any]:
 
     response: AIMessage = llm_with_tools.invoke(messages)
 
-    # Extract concise decision summary for notebook trace
     decision_summary = _generate_concise_decision_summary(response, messages, ticker)
 
     log_trace_event(

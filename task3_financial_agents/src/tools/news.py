@@ -1,9 +1,10 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Convert get_news into a LangChain @tool with GetNewsArgs Pydantic input schema and explicit LLM tool description', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Optimize get_news payload size by truncating long summaries to 250 characters to stay within LLM TPM rate limits', Date: 2026-09-11
 """
 Financial News Tool.
 
 Retrieves recent market and equity news for a ticker symbol using yfinance,
-normalizes news payloads across API version schemas, and returns structured data.
+normalizes news payloads across API version schemas, and returns structured data
+optimized for LLM context token limits.
 """
 
 from typing import Dict, Any, List
@@ -36,6 +37,9 @@ def get_news(ticker: str, n: int = 10) -> Dict[str, Any]:
             error="Article count limit 'n' must be a positive integer."
         ).model_dump()
 
+    # Cap n at 10 to keep payload lightweight
+    limit_n = min(n, 10)
+
     # 2. Retrieve news via yfinance
     try:
         ticker_obj = yf.Ticker(cleaned_ticker)
@@ -58,11 +62,10 @@ def get_news(ticker: str, n: int = 10) -> Dict[str, Any]:
 
     # 3. Normalize news items
     news_items: List[NewsItem] = []
-    for item in raw_news[:n]:
+    for item in raw_news[:limit_n]:
         if not isinstance(item, dict):
             continue
 
-        # Support both legacy flat yfinance schema and modern nested 'content' schema
         content = item.get("content", {}) if isinstance(item.get("content"), dict) else {}
 
         title = (
@@ -77,7 +80,6 @@ def get_news(ticker: str, n: int = 10) -> Dict[str, Any]:
             or "Financial Market News"
         )
 
-        # Published date parsing
         pub_time = item.get("providerPublishTime") or content.get("pubDate")
         if isinstance(pub_time, (int, float)):
             published_date = datetime.fromtimestamp(pub_time).strftime("%Y-%m-%d %H:%M:%S")
@@ -93,12 +95,16 @@ def get_news(ticker: str, n: int = 10) -> Dict[str, Any]:
             or f"https://finance.yahoo.com/quote/{cleaned_ticker}"
         )
 
-        summary = (
+        raw_summary = (
             item.get("summary")
             or content.get("summary")
             or content.get("description")
             or title
         )
+        # Truncate summary to 200 chars for token efficiency
+        clean_summary = str(raw_summary).strip()
+        if len(clean_summary) > 200:
+            clean_summary = clean_summary[:197] + "..."
 
         news_items.append(
             NewsItem(
@@ -106,7 +112,7 @@ def get_news(ticker: str, n: int = 10) -> Dict[str, Any]:
                 publisher=str(publisher).strip(),
                 published_date=str(published_date).strip(),
                 url=str(url).strip(),
-                summary=str(summary).strip()
+                summary=clean_summary
             )
         )
 

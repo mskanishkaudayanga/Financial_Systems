@@ -1,10 +1,10 @@
-# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Convert get_price_data into a LangChain @tool with GetPriceDataArgs Pydantic input schema and explicit LLM tool description', Date: 2026-09-11
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Optimize get_price_data payload size by summarizing historical period metrics and returning last 10 trading days to stay under LLM TPM token limits', Date: 2026-09-11
 """
 Market Price Data Tool.
 
 Retrieves historical OHLCV data for an equity ticker using yfinance,
 calculates key technical indicators (SMA20, SMA50, EMA20, RSI14, daily return),
-and returns structured output with defensive validation.
+and returns concise structured output optimized for LLM token context limits.
 """
 
 from typing import Dict, Any, List
@@ -21,13 +21,6 @@ VALID_PERIODS = {"1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd"
 def _calculate_rsi(series: pd.Series, period: int = 14) -> pd.Series:
     """
     Calculate Relative Strength Index (RSI) using Wilder's exponential smoothing.
-
-    Args:
-        series: Price pandas Series (e.g. Close price).
-        period: RSI window period (default 14).
-
-    Returns:
-        pd.Series: Calculated RSI values between 0.0 and 100.0.
     """
     delta = series.diff()
     gain = delta.where(delta > 0, 0.0)
@@ -116,9 +109,13 @@ def get_price_data(ticker: str, period: str = "1y") -> Dict[str, Any]:
     df["ema20"] = df["Close"].ewm(span=20, adjust=False).mean()
     df["rsi14"] = _calculate_rsi(df["Close"], period=14)
 
-    # 4. Construct response payload
+    # 4. Construct response payload (Trimmed to last 10 sessions to optimize token context)
+    total_records_count = len(df)
+    # Take last 10 trading sessions for detailed record view
+    sample_df = df.tail(10)
+
     records: List[OHLCVRecord] = []
-    for idx, row in df.iterrows():
+    for idx, row in sample_df.iterrows():
         date_str = idx.strftime("%Y-%m-%d") if hasattr(idx, "strftime") else str(idx)[:10]
         records.append(
             OHLCVRecord(
@@ -150,9 +147,9 @@ def get_price_data(ticker: str, period: str = "1y") -> Dict[str, Any]:
         status="success",
         ticker=cleaned_ticker,
         period=cleaned_period,
-        records_count=len(records),
+        records_count=total_records_count,
         latest_indicators=latest_indicators,
-        data=records,
+        data=records,  # Last 10 records (~300 tokens payload)
     )
 
     return output.model_dump()
