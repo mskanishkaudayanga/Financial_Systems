@@ -1,0 +1,12 @@
+# AI-ASSISTED: Gemini (gemini-3.6-flash), Prompt: 'Create .gitignore for task3_financial_agents', Date: 2026-09-11
+.env
+cache/*
+!cache/.gitkeep
+agent_trace.jsonl
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
+.pytest_cache/
+.vscode/
+.idea/
